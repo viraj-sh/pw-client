@@ -1,0 +1,6 @@
+project_plan.md
+venv
+src
+__pycache__
+*/__pycache__
+logs
