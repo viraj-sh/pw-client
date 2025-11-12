@@ -1,5 +1,6 @@
 from core.logging import setup_logging
 from api.system import router as system_router
+from api.auth import router as auth_router
 from fastapi import FastAPI
 import logging
 import os
@@ -16,6 +17,7 @@ logger.info("Application startup complete")
 
 # Include routers
 app.include_router(system_router, prefix="/api")
+app.include_router(auth_router, prefix="/api")
 
 
 if __name__ == "__main__":

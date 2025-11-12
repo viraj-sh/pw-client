@@ -4,3 +4,12 @@ src
 __pycache__
 */__pycache__
 logs
+endpoints.md
+implinks.md
+responses
+test
+prompt.md
+prompt_func copy.md
+prompt_func.md
+prompt_api.md
+.env
