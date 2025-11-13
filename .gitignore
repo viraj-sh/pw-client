@@ -13,3 +13,5 @@ prompt_func copy.md
 prompt_func.md
 prompt_api.md
 .env
+test.md
+.cache

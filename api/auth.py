@@ -1,21 +1,44 @@
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, Query
 from fastapi.responses import JSONResponse
 from typing import Any, Dict
 from core.utils import standard_response
 from core.logging import setup_logging
 from core.exceptions import handle_exception
-from services.auth import send_otp, verify_otp, verify_token
+from services.auth import send_otp, verify_otp, verify_token, logout_user, get_countries
 from schema.pydantic_auth import (
     SendOTPRequest,
     StandardResponse,
     VerifyOtpRequest,
     VerifyOtpResponse,
     VerifyTokenResponse,
+    LogoutResponseModel,
+    StandardResponseModel,
 )
 
 
 router = APIRouter(tags=["Auth"], prefix="/auth")
 logger = setup_logging(name="Auth", level="INFO")
+
+
+@router.get(
+    "/countries",
+    response_model=StandardResponseModel,
+    operation_id="list_countries",
+)
+def list_countries(
+    refetch: bool = Query(False, description="Bypass cache and refetch country data")
+) -> JSONResponse:
+    logger = setup_logging(name="api.list_countries", level="INFO")
+
+    try:
+        result: Dict[str, Any] = get_countries(refetch=refetch)
+        return JSONResponse(content=result, status_code=result.get("status_code", 200))
+
+    except Exception as exc:
+        handled = handle_exception(logger, exc, context="list_countries")
+        return JSONResponse(
+            content=handled, status_code=handled.get("status_code", 500)
+        )
 
 
 @router.post(
@@ -76,3 +99,26 @@ async def verify_token_endpoint() -> JSONResponse:
 
     except Exception as exc:
         return handle_exception(logger, exc, context="verify_token_endpoint")
+
+
+@router.post(
+    "/logout",
+    response_model=LogoutResponseModel, operation_id="logout_user_operation",)
+async def logout_endpoint() -> JSONResponse:
+    logger = setup_logging(name="api.logout_user", level="INFO")
+
+    try:
+        result: Dict[str, Any] = logout_user()
+
+        if not isinstance(result, dict):
+            logger.warning("Invalid response format from logout_user.")
+            result = standard_response(
+                success=False,
+                error="Unexpected response from core logic",
+                status_code=500,
+            )
+
+        return JSONResponse(content=result, status_code=result.get("status_code", 200))
+
+    except Exception as exc:
+        return handle_exception(logger, exc, context="logout_endpoint")

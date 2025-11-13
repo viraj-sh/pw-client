@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, List
 
 
 class SendOTPRequest(BaseModel):
@@ -78,3 +78,33 @@ class VerifyTokenResponse(BaseModel):
     status_code: int = Field(
         ..., description="HTTP status code corresponding to the result"
     )
+class LogoutResponseModel(BaseModel):
+    success: bool = Field(..., description="Indicates if the operation was successful.")
+    error: Optional[str] = Field(
+        None, description="Error message if the operation failed."
+    )
+    data: Optional[Dict[str, Any]] = Field(
+        None, description="Response data on success."
+    )
+    status_code: int = Field(
+        ..., description="HTTP status code corresponding to the result."
+    )
+
+class CountryModel(BaseModel):
+    country_abbr: str = Field(
+        ..., description="Two-letter country abbreviation, e.g., 'IN'"
+    )
+    country_flag: Optional[str] = Field(
+        None, description="Country flag emoji or icon URL"
+    )
+    country_name: str = Field(..., description="Full country name, e.g., 'India'")
+    country_code: Optional[str] = Field(None, description="Country dialing or ISO code")
+
+
+class StandardResponseModel(BaseModel):
+    success: bool = Field(..., description="Indicates if the request was successful")
+    error: Optional[str] = Field(None, description="Error message, if any")
+    data: Optional[List[CountryModel]] = Field(
+        None, description="List of available countries"
+    )
+    status_code: int = Field(..., description="HTTP status code for the response")

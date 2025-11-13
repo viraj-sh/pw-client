@@ -6,6 +6,8 @@ from datetime import timedelta
 from core.utils import EnvManager, standard_response
 from core.logging import setup_logging
 from core.exceptions import handle_exception
+from core.cache import cached_request, invalidate_cache
+from .data_model.model_auth import Country
 
 def send_otp(phone: str, country_code: str) -> Dict[str, Any]:
     logger = setup_logging(name="services.send_otp", level="INFO")
@@ -202,3 +204,151 @@ def verify_token() -> Dict[str, Any]:
 
     except Exception as exc:
         return handle_exception(logger, exc, context="verify_token")
+
+
+def logout_user() -> Dict[str, Any]:
+    logger = setup_logging(name="core.logout_user", level="INFO")
+
+    try:
+        url = "https://api.penpencil.co/v1/oauth/logout"
+        token = EnvManager.get("TOKEN")
+
+        if not token:
+            logger.warning("Missing TOKEN in environment.")
+            return standard_response(
+                False, error="Token not configured", status_code=401
+            )
+
+        device_id = token.replace("Bearer ", "")
+        payload = {"deviceId": device_id}
+        headers = {
+            "client-type": "WEB",
+            "content-type": "application/json",
+            "authorization": token,
+        }
+
+        logger.info("Initiating logout request to Penpencil API.")
+        response = requests.post(
+            url, data=json.dumps(payload), headers=headers, timeout=10
+        )
+
+        if response.status_code != 200:
+            logger.warning(f"Unexpected API response status: {response.status_code}")
+            return standard_response(
+                False,
+                error=f"Unexpected status code: {response.status_code}",
+                status_code=response.status_code,
+            )
+
+        result = response.json()
+        success = result.get("success", False)
+
+        if not success:
+            error_info = result.get("error", {})
+            message = error_info.get("message", "Logout failed")
+            logger.warning(f"Logout unsuccessful: {message}")
+            return standard_response(False, error=message, status_code=400)
+
+        logger.info("Logout request successful. Verifying token status.")
+        verification = verify_token()
+
+        # If verification fails (e.g., 401, token invalid), that means logout succeeded
+        if not verification.get("success"):
+            logger.info(
+                "Token verification failed after logout — token invalidated successfully."
+            )
+            EnvManager.unset("TOKEN")
+            return standard_response(True, data={"logout": True}, status_code=200)
+
+        verified = verification["data"].get("isVerified", True)
+        if verified:
+            logger.warning("Token still valid after logout attempt — logout failed.")
+            return standard_response(
+                False, error="Token still active after logout", status_code=400
+            )
+
+        logger.info("Logout completed successfully and token invalidated.")
+        EnvManager.unset("TOKEN")
+        return standard_response(True, data={"logout": True}, status_code=200)
+
+    except Exception as exc:
+        return handle_exception(logger, exc, context="logout_user")
+
+
+def get_countries(refetch: bool = False) -> Dict[str, Any]:
+    logger = setup_logging(name="core.get_countries", level="INFO")
+    log_prefix = "[PWLiveAPI] "
+
+    try:
+        url = "https://static.pw.live/auth-fe/assets/json/app-constants.json"
+
+        headers = {
+            "accept": "*/*",
+            "accept-language": "en-US,en;q=0.6",
+            "referer": "https://www.pw.live/",
+            "origin": "https://www.pw.live/",
+            "user-agent": (
+                "Mozilla/5.0 (X11; Linux x86_64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/141.0.0.0 Safari/537.36"
+            ),
+        }
+        # Add no-cache headers only if explicitly refetching
+        if refetch:
+            headers.update(
+                {
+                    "cache-control": "no-cache",
+                    "pragma": "no-cache",
+                }
+            )
+
+        response = cached_request(
+            method="GET",
+            url=url,
+            headers=headers,
+            log_prefix=log_prefix,
+            expire_after=timedelta(hours=24),
+            refetch=refetch,
+        )
+
+        if not response:
+            return standard_response(
+                False, error="Empty response from API", status_code=400
+            )
+
+        if hasattr(response, "json"):
+            try:
+                response = response.json()
+            except Exception:
+                return standard_response(
+                    False, error="Failed to parse JSON from API", status_code=400
+                )
+
+        if not isinstance(response, list):
+            return standard_response(
+                False, error="Unexpected response format", status_code=400
+            )
+
+        countries: List[Dict[str, Any]] = []
+        for item in response:
+            if isinstance(item, dict):
+                parsed = Country.from_json(item)
+                if parsed:
+                    countries.append(
+                        {
+                            "country_abbr": parsed.country_abbr,
+                            "country_flag": parsed.country_flag,
+                            "country_name": parsed.country_name,
+                            "country_code": parsed.country_code,
+                        }
+                    )
+
+        if not countries:
+            return standard_response(
+                False, error="No valid country data found", status_code=404
+            )
+
+        return standard_response(True, data=countries, status_code=200)
+
+    except Exception as exc:
+        return handle_exception(logger, exc, context="get_countries")
