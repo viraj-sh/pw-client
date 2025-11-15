@@ -15,3 +15,5 @@ prompt_api.md
 .env
 test.md
 .cache
+test.py
+test.json
