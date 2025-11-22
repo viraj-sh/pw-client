@@ -9,8 +9,8 @@ from schema.pydantic_content import GetBatchesResponse, StandardResponseModel, C
 from services.content import get_batches, get_sub, get_ch, get_ch_content
 
 
-router = APIRouter(tags=["Content"], prefix="/content")
-logger = setup_logging(name="Content", level="INFO")
+router = APIRouter(tags=["Lecture Content"], prefix="/content")
+logger = setup_logging(name="Lecture Content", level="INFO")
 
 
 @router.get(
@@ -64,7 +64,7 @@ def get_batch_subjects(
 
 
 @router.post(
-    "/content/{batch_id}/chapters",
+    "/{batch_id}/chapters",
     response_model=StandardResponseModel,
     operation_id="getChaptersForBatch",
 )
