@@ -1,0 +1,106 @@
+name: "✨ Feature Request"
+description: "Propose enhancements or missing functionality for pw-client"
+title: "[Feature]: "
+labels: ["feature"]
+body:
+
+  - type: markdown
+    attributes:
+      value: |
+        Use this form to propose a new feature or improvement for **pw-client**.
+        This includes missing functionality compared to the official pw.live client,
+        enhancements to the API, MCP integration, or future frontend capabilities.
+
+  # -----------------------------
+  # FEATURE SUMMARY
+  # -----------------------------
+  - type: input
+    id: summary
+    attributes:
+      label: Feature Summary
+      description: "Short one-line description of the feature being proposed."
+      placeholder: "e.g., Add support for fetching detailed test analytics"
+    validations:
+      required: true
+
+  # -----------------------------
+  # AREA / COMPONENT
+  # -----------------------------
+  - type: dropdown
+    id: area
+    attributes:
+      label: Feature Area
+      description: "Which part of pw-client does the feature relate to?"
+      options:
+        - API (backend logic, endpoints, request handling)
+        - MCP (Model Context Protocol integration)
+        - Frontend (upcoming UI/client)
+        - Authentication / Session Handling
+        - Developer Experience (logging, debug tools, local utilities)
+        - Documentation
+        - Other / Not Sure
+    validations:
+      required: true
+
+  # -----------------------------
+  # COMPARISON (OPTIONAL)
+  # -----------------------------
+  - type: textarea
+    id: official_parity
+    attributes:
+      label: Parity With Official pw.live Client (Optional)
+      description: "If this feature exists in the official pw.live client, describe how it works there."
+      placeholder: |
+        Describe how the official pw.live client handles this feature,
+        if applicable. Leave blank if not relevant.
+
+  # -----------------------------
+  # PROBLEM STATEMENT
+  # -----------------------------
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Missing Capability
+      description: "Explain what problem this feature solves, or what functionality is missing."
+      placeholder: |
+        Explain the limitation or capability gap this feature addresses.
+        Example:
+        - API does not expose X endpoint yet
+        - pw.live client supports Y, pw-client does not
+        - MCP workflow requires extra manual steps
+    validations:
+      required: true
+
+  # -----------------------------
+  # PROPOSED SOLUTION
+  # -----------------------------
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Implementation / Behavior
+      description: "How should the feature work? Describe expected behavior or technical outline."
+      placeholder: |
+        Describe expected behavior, API contract, UI/UX interaction,
+        or MCP integration. Include technical details when possible.
+    validations:
+      required: true
+
+  # -----------------------------
+  # ALTERNATIVES
+  # -----------------------------
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or Workarounds Considered
+      description: "If you considered other solutions or temporary workarounds, describe them."
+      placeholder: "Optional: List any other approaches or workarounds."
+
+  # -----------------------------
+  # ADDITIONAL CONTEXT
+  # -----------------------------
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: "Anything else that helps understanding this feature request."
+      placeholder: "Logs, references, official client behavior, screenshots, etc."
