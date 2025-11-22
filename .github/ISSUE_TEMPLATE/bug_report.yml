@@ -1,0 +1,118 @@
+name: "Report a bug"
+description: "Please provide a clear and concise description of the problem in pw-client"
+title: "[Bug]: "
+labels: ["bug"]
+body:
+
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue!  
+        Please complete the form below to help us reproduce and fix the problem quickly.  
+        Incomplete reports may be harder to debug.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: "Which part of pw-client is affected?"
+      options:
+        - API
+        - MCP (Model Context Protocol)
+        - Frontend / UI
+        - Docker (local build)
+        - Docker Hub image
+        - Deployment (Render / Vercel / Other)
+        - CLI / Local Scripts
+        - Other / Not Sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install_method
+    attributes:
+      label: How are you running pw-client?
+      options:
+        - Manual git clone (local development)
+        - Local Docker build (using repo Dockerfile)
+        - Docker Hub image (pre-built)
+        - Render deployment
+        - Vercel deployment
+        - Other remote hosting
+        - Not sure / Other
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version / Branch
+      description: "Which version/branch/commit hash were you using?"
+      placeholder: "e.g. v0.4.2, dev, feature/mcp-updates, commit 4af12c9"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      placeholder: "A clear and concise description of the issue."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: "Exact steps required to reproduce the issue."
+      placeholder: |
+        1. Clone repo / Start Docker / Start deployment...
+        2. Call API / Interact with UI / Connect to MCP...
+        3. Execute specific command...
+        4. Error occurs...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      placeholder: "What should have happened instead?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      placeholder: "What actually happened? Include error messages if applicable."
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Error Output / Stack Trace
+      description: "Paste any relevant logs or console output."
+      render: shell
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Information
+      description: "Your system / runtime details."
+      placeholder: |
+        - OS: Ubuntu 22.04 / macOS / Windows
+        - Python version: 3.11.x
+        - Browser (if frontend): Chrome / Firefox / etc.
+        - Docker version (if Docker related):
+        - Node version (if frontend related):
+        - Hosting environment (if deployed): Render / Vercel / etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional Context
+      placeholder: "Anything else we should know? Screenshots? Related issues?"
