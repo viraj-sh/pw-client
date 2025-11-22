@@ -8,6 +8,9 @@ from .data_model.model_content import (
     BatchInfo,
     ChapterItem,
     ChapterContentDoc,
+    TestEntry,
+    TestPerformance,
+    DPPTestSolutionItem,
 )
 from typing import Optional, Any, Dict, List
 
@@ -342,3 +345,315 @@ def get_ch_content(
 
     except Exception as exc:
         return handle_exception(logger, exc, context="get_ch_content")
+
+
+def fetch_dpp_tests(
+    batch_id: str,
+    subject_id: str,
+    chapter_id: str,
+    page: int = 1,
+    limit: int = 20,
+    dpp_type: str = "ALL",
+    refetch: bool = False,
+) -> Dict[str, Any]:
+
+    logger = setup_logging(name="core.fetch_dpp_tests", level="INFO")
+
+    try:
+        logger.info("Fetching API token using EnvManager...")
+        token = EnvManager.get("TOKEN", default=None)
+
+        if not token:
+            return standard_response(
+                success=False,
+                error="Missing TOKEN in environment",
+                status_code=400,
+            )
+
+        base_url = "https://api.penpencil.co/v3/test-service/tests/new-dpp-list"
+        params = {
+            "page": page,
+            "batchId": batch_id,
+            "batchSubjectId": subject_id,
+            "chapterId": chapter_id,
+            "dppType": dpp_type,
+            "limit": limit,
+        }
+
+        headers = {
+            "content-type": "application/json",
+            "user-agent": "Mozilla/5.0 (compatible; PenPencilFetcher/1.0)",
+            "origin": "https://www.pw.live",
+            "referer": "https://www.pw.live/",
+            "authorization": token,
+        }
+
+        response = cached_request(
+            method="GET",
+            url=base_url,
+            params=params,
+            headers=headers,
+            expire_after=timedelta(minutes=10),
+            log_prefix="[DPPList] ",
+            refetch=refetch,
+        )
+
+        try:
+            payload = response.json()
+        except Exception:
+            invalidate_cache(response)
+            return standard_response(
+                False, error="Invalid JSON from DPP API", status_code=400
+            )
+
+        if (
+            not isinstance(payload, dict)
+            or "data" not in payload
+            or not isinstance(payload["data"], list)
+        ):
+            invalidate_cache(response)
+            return standard_response(
+                False,
+                error="Unexpected or malformed DPP response",
+                status_code=400,
+            )
+
+        data_list = payload.get("data", [])
+        results: List[TestEntry] = []
+
+        for item in data_list:
+            quiz_details = item.get("dppQuizDetails", {})
+            test_data = quiz_details.get("test", {})
+
+            tag = (quiz_details.get("tag") or "").lower()
+            attempted = tag == "reattempt"
+            attempt_id = (
+                quiz_details.get("testStudentMapping", {}).get("_id")
+                if attempted
+                else None
+            )
+
+            performance_obj = None
+
+            if attempted and attempt_id:
+                result_url = (
+                    f"https://api.penpencil.co/v3/test-service/tests/"
+                    f"{test_data.get('_id')}/my-result"
+                )
+
+                result_response = cached_request(
+                    method="GET",
+                    url=result_url,
+                    headers=headers,
+                    expire_after=timedelta(minutes=10),
+                    log_prefix="[DPPResult] ",
+                    refetch=refetch,
+                )
+
+                try:
+                    result_json = result_response.json()
+                except Exception:
+                    invalidate_cache(result_response)
+                    result_json = {}
+
+                perf = (
+                    result_json.get("data", {}).get("yourPerformance", {})
+                    if isinstance(result_json, dict)
+                    else {}
+                )
+
+                performance_obj = TestPerformance.from_json(
+                    {
+                        "total_marks": perf.get("totalScore"),
+                        "user_marks": perf.get("userScore"),
+                        "time_taken": perf.get("timeTaken"),
+                        "total_questions": perf.get("totalQuestions"),
+                        "attempted_questions": perf.get("attemptedQuestions"),
+                        "unattempted_questions": perf.get("unAttemptedQuestions"),
+                        "correct_questions": perf.get("correctQuestions"),
+                        "incorrect_questions": perf.get("inCorrectQuestions"),
+                        "accuracy": perf.get("accuracy"),
+                        "completed": perf.get("completed"),
+                        "incorrect_score": perf.get("inCorrectScore"),
+                        "unattempted_score": perf.get("unAttemptedScore"),
+                    }
+                )
+
+            entry_dict = {
+                "order": item.get("_id"),
+                "type": item.get("type"),
+                "attempted": attempted,
+                "attempt_id": attempt_id,
+                "test_id": test_data.get("_id"),
+                "test_name": test_data.get("name"),
+                "total_marks": test_data.get("totalMarks"),
+                "total_questions": test_data.get("totalQuestions"),
+                "date": test_data.get("createdAt"),
+                "performance": (performance_obj.__dict__ if performance_obj else None),
+            }
+
+            entry_obj = TestEntry.from_json(entry_dict)
+            if entry_obj:
+                results.append(entry_obj)
+
+        return standard_response(
+            True, data={"tests": [i.to_dict() for i in results]}, status_code=200
+        )
+
+    except Exception as exc:
+        return handle_exception(logger, exc, context="fetch_dpp_tests")
+
+
+def fetch_dpp_test_sol(
+    attempt_id: Optional[str] = None, refetch: bool = False
+) -> Dict[str, Any]:
+    logger = setup_logging(name="core.fetch_dpp_test_sol", level="INFO")
+
+    try:
+        if not attempt_id:
+            return standard_response(
+                success=False,
+                error="Missing required parameter: attempt_id",
+                status_code=400,
+            )
+
+        token = EnvManager.get("TOKEN", default=None)
+        logger.info("Loaded TOKEN from environment")
+
+        if not token:
+            return standard_response(
+                success=False,
+                error="TOKEN missing from environment",
+                status_code=400,
+            )
+
+        url = f"https://api.penpencil.co/v3/test-service/tests/mapping/{attempt_id}/preview-test"
+        headers = {
+            "content-type": "application/json",
+            "user-agent": "Mozilla/5.0 (compatible; PenPencilFetcher/1.0)",
+            "origin": "https://www.pw.live",
+            "referer": "https://www.pw.live/",
+            "authorization": token,
+        }
+
+        raw_response = cached_request(
+            method="GET",
+            url=url,
+            headers=headers,
+            log_prefix="[DPPTestSol] ",
+            expire_after=timedelta(minutes=30),
+            refetch=refetch,
+        )
+
+        if raw_response is None:
+            return standard_response(
+                success=False,
+                error="Empty response from API",
+                status_code=400,
+            )
+
+
+        if hasattr(raw_response, "json"):
+            try:
+                response = raw_response.json()
+            except Exception:
+                logger.warning("Failed to parse JSON; using text")
+                response = {"raw": raw_response.text}
+
+
+        elif isinstance(raw_response, dict):
+            response = raw_response
+
+        else:
+            return standard_response(
+                success=False,
+                error="Invalid response format returned by cached_request",
+                status_code=400,
+            )
+
+        if not isinstance(response, dict):
+            return standard_response(
+                success=False,
+                error="Malformed API response",
+                status_code=400,
+            )
+
+        if not response.get("success", True):
+            invalidate_cache(raw_response)
+            return standard_response(
+                success=False,
+                error="API returned an error",
+                status_code=400,
+            )
+
+        data_root = response.get("data", {})
+        difficulty_levels_map = {
+            lvl.get("level"): lvl.get("title")
+            for lvl in data_root.get("difficultyLevels", [])
+        }
+
+        results: List[Dict[str, Any]] = []
+
+        for q in data_root.get("questions", []):
+            qinfo = q.get("question", {})
+
+            img_en = qinfo.get("imageIds", {}).get("en", {})
+            question_id = img_en.get("_id")
+            question_name = img_en.get("name")
+            endlink = (img_en.get("baseUrl", "") or "") + (img_en.get("key", "") or "")
+
+            difficulty_level = difficulty_levels_map.get(
+                qinfo.get("difficultyLevel"), "Unknown"
+            )
+
+            option_map = {
+                opt["_id"]: opt.get("texts", {}).get("en")
+                for opt in qinfo.get("options", [])
+            }
+
+            sols = [
+                option_map.get(sid)
+                for sid in qinfo.get("solutions", [])
+                if sid in option_map
+            ]
+
+            sol_desc_list = []
+            for sol in qinfo.get("solutionDescription", []):
+                img = sol.get("imageIds", {}).get("en", {})
+                sol_desc_list.append(
+                    {
+                        "sol_id": img.get("_id"),
+                        "sol_name": img.get("name"),
+                        "endlink": (img.get("baseUrl", "") or "")
+                        + (img.get("key", "") or ""),
+                    }
+                )
+
+            record = {
+                "question_id": question_id,
+                "question_name": question_name,
+                "endlink": endlink,
+                "order": qinfo.get("questionNumber"),
+                "positive_marks": qinfo.get("positiveMarks"),
+                "negative_marks": qinfo.get("negativeMarks"),
+                "difficulty": difficulty_level,
+                "solutions": sols,
+                "solution_descriptions": sol_desc_list,
+            }
+
+            parsed = DPPTestSolutionItem.from_json(record)
+            if parsed is not None:
+                results.append(record)
+
+        return standard_response(
+            success=True,
+            data={"questions": results},
+            status_code=200,
+        )
+
+    except Exception as exc:
+        return handle_exception(
+            logger,
+            exc,
+            context="fetch_dpp_test_sol",
+        )

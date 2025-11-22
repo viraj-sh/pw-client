@@ -94,3 +94,64 @@ class StandardResponse(BaseModel):
     error: Optional[str]
     data: Optional[Any]
     status_code: int
+
+class TestPerformanceModel(BaseModel):
+    total_marks: Optional[float] = None
+    user_marks: Optional[float] = None
+    time_taken: Optional[int] = None
+    total_questions: Optional[int] = None
+    attempted_questions: Optional[int] = None
+    unattempted_questions: Optional[int] = None
+    correct_questions: Optional[int] = None
+    incorrect_questions: Optional[int] = None
+    accuracy: Optional[float] = None
+    completed: Optional[bool] = None
+    incorrect_score: Optional[float] = None
+    unattempted_score: Optional[float] = None
+
+class TestEntryModel(BaseModel):
+    order: Optional[str]
+    type: Optional[str]
+    attempted: bool = False
+    attempt_id: Optional[str]
+    test_id: Optional[str]
+    test_name: Optional[str]
+    total_marks: Optional[float]
+    total_questions: Optional[int]
+    date: Optional[str]
+    performance: Optional[TestPerformanceModel]
+
+class DPPTestsData(BaseModel):
+    tests: List[TestEntryModel] = Field(default_factory=list)
+
+from typing import Optional, Any, Dict, List
+from pydantic import BaseModel, Field
+
+
+class SolutionDescriptionModel(BaseModel):
+    sol_id: Optional[str] = Field(None)
+    sol_name: Optional[str] = Field(None)
+    endlink: Optional[str] = Field(None)
+
+
+class DPPQuestionModel(BaseModel):
+    question_id: Optional[str] = Field(None)
+    question_name: Optional[str] = Field(None)
+    endlink: Optional[str] = Field(None)
+    order: Optional[int] = Field(None)
+    positive_marks: Optional[float] = Field(None)
+    negative_marks: Optional[float] = Field(None)
+    difficulty: Optional[str] = Field(None)
+    solutions: Optional[List[str]] = Field(default=None)
+    solution_descriptions: Optional[List[SolutionDescriptionModel]] = Field(
+        default=None
+    )
+
+
+class DPPTestSolutionResponse(BaseModel):
+    success: bool = Field(..., description="Whether the request succeeded")
+    error: Optional[str] = Field(None, description="Error message if any")
+    data: Optional[Dict[str, Any]] = Field(
+        None, description="Response payload such as questions"
+    )
+    status_code: int = Field(..., description="HTTP status code returned by API")
