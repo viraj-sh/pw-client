@@ -56,6 +56,7 @@ body:
     id: description
     attributes:
       label: Bug Description
+      description: "Provide a clear and detailed explanation of the issue."
       placeholder: "A clear and concise description of the issue."
     validations:
       required: true
@@ -77,6 +78,7 @@ body:
     id: expected
     attributes:
       label: Expected Behavior
+      description: "Describe what you expected to happen instead of the issue you encountered."
       placeholder: "What should have happened instead?"
     validations:
       required: true
@@ -85,6 +87,7 @@ body:
     id: actual
     attributes:
       label: Actual Behavior
+      description: "Describe what actually happened. Include error messages or incorrect behavior you observed."
       placeholder: "What actually happened? Include error messages if applicable."
     validations:
       required: true
