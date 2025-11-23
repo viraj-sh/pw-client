@@ -77,6 +77,7 @@ async def get_lecture_subject_stats(
 @router.get(
     "/{batch_id}/quiz/overview",
     response_model=StandardResponseModel,
+    operation_id="get_quiz_overview",
 )
 def get_quiz_overview(
     batch_id: str,

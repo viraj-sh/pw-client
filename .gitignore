@@ -17,3 +17,6 @@ test.md
 .cache
 test.py
 test.json
+dist
+build
+app.spec

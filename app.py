@@ -8,7 +8,7 @@ from api.announcement import router as announcement_router
 from fastapi import FastAPI
 import logging
 import os
-
+from fastapi_mcp import FastApiMCP
 
 logger = setup_logging(name="app", level="INFO")
 
@@ -27,6 +27,31 @@ app.include_router(dpp_content_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
 app.include_router(announcement_router, prefix="/api")
 
+# MCP Tools
+mcp = FastApiMCP(
+    app,
+    include_operations=[
+        "get_system_info",
+        "check_system_health",
+        "list_countries",
+        "send_otp_v1",
+        "verify_user_otp",
+        "verifyTokenAuthCheck",
+        "logout_user_operation",
+        "getUserBatches",
+        "get_batch_subjects",
+        "getChaptersForBatch",
+        "fetch_chapter_content",
+        "get_dpp_tests",
+        "fetchDPPTestSolution",
+        "fetchAnnouncements",
+        "get_lecture_overview",
+        "getLectureSubjectStats",
+        "get_quiz_overview",
+        "getQuizSubjectStats",
+    ],
+)
+mcp.mount_http()
 
 if __name__ == "__main__":
     import uvicorn
