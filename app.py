@@ -3,6 +3,7 @@ from api.system import router as system_router
 from api.auth import router as auth_router
 from api.lecture_content import router as lec_content_router
 from api.dpp_content import router as dpp_content_router
+from api.dashboard import router as dashboard_router
 from fastapi import FastAPI
 import logging
 import os
@@ -22,6 +23,7 @@ app.include_router(system_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(lec_content_router, prefix="/api")
 app.include_router(dpp_content_router, prefix="/api")
+app.include_router(dashboard_router, prefix="/api")
 
 
 if __name__ == "__main__":
