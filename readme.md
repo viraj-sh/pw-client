@@ -1,97 +1,119 @@
-[![Latest Release](https://img.shields.io/github/v/release/viraj-sh/pw-client)](#)
+<div align="center">
+
 # **pw-client**
 
-A user-side client for **pw.live**, providing a streamlined interface to access officially enrolled course materials such as **Notes, DPPs, Quizzes, Announcements, and Solutions**.  
-Includes a fully working **FastAPI backend** and **MCP server**, with a **frontend currently under development**.
+A user-side client for **[pw.live](https://www.pw.live/)**, providing a streamlined interface to access officially enrolled course materials such as **Notes, DPPs, Quizzes, Announcements, and Solutions**. Includes a fully working [API](https://github.com/viraj-sh/pw-client/wiki/API-Documentation), [MCP Server](https://github.com/viraj-sh/pw-client/wiki/MCP-Documentation) and [Frontend](https://github.com/viraj-sh/pw-client/wiki/Frontend-Documentation) (currently under development).
 
----
-
-# **Quick Deployment Options**
-
-### Deploy to Render
-<a href="https://render.com/deploy?repo=https://github.com/viraj-sh/pw-client/tree/v3.0" target="_blank">
-  <img src="https://render.com/images/deploy-to-render-button.svg" alt="Deploy to Render" width="180"/>
+<a href="https://github.com/viraj-sh/pw-client/releases/latest">
+  <img src="https://img.shields.io/github/v/release/viraj-sh/pw-client?label=Latest%20Release&color=green&style=flat-square&cacheSeconds=3600" alt="Release"/>
+</a>
+<a href="https://hub.docker.com/r/virajsh/pw-client">
+  <img src="https://img.shields.io/docker/v/virajsh/pw-client?label=Docker&color=blue&sort=semver&style=flat-square" alt="Docker"/>
+</a>
+<a href="https://github.com/viraj-sh/pw-client/wiki">
+  <img src="https://img.shields.io/badge/docs-wiki-orange?style=flat-square" alt="Wiki"/>
 </a>
 
-### Prebuilt Release Binaries
-Multi-platform binaries are available under **Releases**:
-- Linux
-- Windows
-- macOS  
-
-Download and run directly.
+</div>
 
 ---
 
-# **Unified Endpoints (Same For All Deployment Methods)**
+## Getting Started
 
-Whether running locally, via Docker, Render, or release binaries:
+The client can be run using a **[prebuilt release](https://github.com/viraj-sh/pw-client/releases/latest)** (recommended), **[built from source](#option-1-building-from-source-without-docker)**, or **[Docker](#option-2-running-with-docker)**. Quick deployment is also supported on **Render**.
 
-- API → `/api`  
-- API Docs (Swagger) → `/docs`  
-- MCP Server → `/mcp`  
-- Frontend (in development) → `/`
+<!-- Download Latest Releases -->
+<div style="margin-bottom: 1em;">
+  <!-- <strong style="font-size:1.1em;">Download Latest Releases:</strong> -->
+  <div style="margin-top:0.5em;">
+    <!-- <a href="https://github.com/viraj-sh/pw-client/releases/download/v1.3.0/pw-client.exe" target="_blank">
+      <img src="https://img.shields.io/badge/Windows-x64-blue?style=flat-square" alt="Download Windows" />
+    </a> -->
+    <!-- <a href="https://github.com/viraj-sh/pw-client/releases/latest/download/pw-client-linux.tar.gz" target="_blank">
+      <img src="https://img.shields.io/badge/Linux-x64-orange?style=flat-square" alt="Download Linux" />
+    </a>
+    <a href="https://github.com/viraj-sh/pw-client/releases/latest/download/pw-client-macos.zip" target="_blank">
+      <img src="https://img.shields.io/badge/macOS-x64-lightgrey?style=flat-square" alt="Download macOS" />
+    </a> -->
+  </div>
+</div>
 
-If running locally → `http://localhost:8000/...`  
-If deployed → `https://your-domain/...`
-
-Paths remain **exactly the same** across all environments.
+<!-- Quick Deployment -->
+<div style="margin-top:1.5em;">
+  <strong style="font-size:1.1em;">Quick Deployment:</strong>
+  <div style="margin-top:0.5em;">
+    <a href="https://render.com/deploy?repo=https://github.com/viraj-sh/pw-client/tree/v3.0" target="_blank">
+      <img src="https://render.com/images/deploy-to-render-button.svg" alt="Deploy to Render" width="180"/>
+    </a>
+  </div>
+</div>
 
 ---
 
-# **Local Development**
+### Available Services
 
-### 1. Clone Repo
+Once the client is running, the following endpoints are accessible (the host may vary, but the paths remain the same):
+
+- **Frontend:** [http://localhost:8000](http://localhost:8000)
+- **MCP Server:** [http://localhost:8000/mcp](http://localhost:8000/mcp)
+- **API:** [http://127.0.0.1:8000/api](http://127.0.0.1:8000/api)
+
+  - **Swagger UI:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+
+---
+
+## Option 1: Building from Source (Without Docker)
+
 ```bash
-git clone https://github.com/viraj-sh/pw-client.git
+git clone https://github.com/viraj-sh/pw-client
 cd pw-client
-````
 
-### 2. Virtual Environment + Install
+python -m venv venv
 
-```bash
-python3 -m venv venv
-source venv/bin/activate      # Linux/Mac
-venv\Scripts\activate         # Windows
+venv\Scripts\activate # Windows
+source venv/bin/activate # macOS/Linux
 
 pip install --upgrade pip
 pip install -r requirements.txt
-```
 
-### 3. Run API
-
-```bash
 python app.py
-# or
-uvicorn app:app --reload
 ```
 
 ---
 
-# **Docker Deployment**
+## Option 2: Running with Docker
 
-### Build & Run
+### 1. Use Prebuilt Image from Docker Hub (Recommended)
 
 ```bash
+docker pull virajsh/pw-client:latest
+docker run -p 8000:8000 virajsh/pw-client:latest
+```
+
+### 2. Build Locally
+
+A `Dockerfile` is included in the repository.
+
+```bash
+git clone https://github.com/viraj-sh/pw-client
+cd pw-client
 docker build -t pw-client .
 docker run -p 8000:8000 pw-client
 ```
 
-### Using Prebuilt Image
+### 3. Docker Compose
+
+A [`docker-compose.yaml`](https://github.com/viraj-sh/pw-client/blob/v3.0/docker-compose.yaml) is included in the repository.
 
 ```bash
-docker run -p 8000:8000 virajsh/pw-client
-```
+# using curl
+curl -L -o docker-compose.yaml https://github.com/viraj-sh/pw-client/raw/v3.0/docker-compose.yaml 
 
-### Using docker-compose
+# using wget
+wget -O docker-compose.yaml https://github.com/viraj-sh/pw-client/raw/v3.0/docker-compose.yaml 
 
-A docker-compose file is included in the repo:
-
-**Download directly:**
-[https://raw.githubusercontent.com/viraj-sh/pw-client/v3.0/docker-compose.yml](https://raw.githubusercontent.com/viraj-sh/pw-client/v3.0/docker-compose.yml)
-
-```bash
-docker compose up -d
+docker-compose up -d
 ```
 
 ---
