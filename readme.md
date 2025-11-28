@@ -1,6 +1,5 @@
+[![Latest Release](https://img.shields.io/github/v/release/viraj-sh/pw-client)](#)
 # **pw-client**
-[![Latest Release](https://img.shields.io/github/v/release/viraj-sh/pw-client)]()
-[![Downloads](https://img.shields.io/github/downloads/viraj-sh/pw-client/total)]()
 
 A user-side client for **pw.live**, providing a streamlined interface to access officially enrolled course materials such as **Notes, DPPs, Quizzes, Announcements, and Solutions**.  
 Includes a fully working **FastAPI backend** and **MCP server**, with a **frontend currently under development**.
@@ -10,7 +9,9 @@ Includes a fully working **FastAPI backend** and **MCP server**, with a **fronte
 # **Quick Deployment Options**
 
 ### Deploy to Render
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+<a href="https://render.com/deploy?repo=https://github.com/viraj-sh/pw-client/tree/v3.0" target="_blank">
+  <img src="https://render.com/images/deploy-to-render-button.svg" alt="Deploy to Render" width="180"/>
+</a>
 
 ### Prebuilt Release Binaries
 Multi-platform binaries are available under **Releases**:
