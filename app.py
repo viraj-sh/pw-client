@@ -1,4 +1,5 @@
 from core.logging import setup_logging
+from core.utils import frontend_path
 from api.system import router as system_router
 from api.auth import router as auth_router
 from api.lecture_content import router as lec_content_router
@@ -18,6 +19,16 @@ origins = ["*"]
 
 
 logger.info("Application startup complete")
+
+static_dir = frontend_path()
+
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+
+@app.get("/", include_in_schema=False)
+def serve_frontend():
+    return FileResponse(os.path.join(static_dir, "index.html"))
+
 
 # Include routers
 app.include_router(system_router, prefix="/api")

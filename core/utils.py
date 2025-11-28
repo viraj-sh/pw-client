@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv, set_key
 from typing import Any, Optional
+import sys
 
 ENV_PATH = ".env"
 
@@ -56,3 +57,15 @@ def standard_response(
         "data": data if success else None,
         "status_code": status_code,
     }
+
+
+def resource_path(path):
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, path)
+    return os.path.join(os.path.abspath("."), path)
+
+
+def frontend_path():
+    if hasattr(sys, "_MEIPASS"):
+        return resource_path("frontend")
+    return "frontend"
