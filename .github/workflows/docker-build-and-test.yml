@@ -37,11 +37,6 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Hash JS/CSS Assets
-        run: |
-          cd app/static
-          python3 hash.py hash
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
