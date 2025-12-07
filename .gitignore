@@ -21,5 +21,5 @@ dist
 build
 app.spec
 design_plan.md
-frontend/test.html
-frontend/test_index.html
+static/test.html
+static/test_index.html

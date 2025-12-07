@@ -1,0 +1,9 @@
+requests==2.32.5
+requests-cache==1.2.1
+python-dotenv==1.2.1
+python-json-logger==4.0.0
+uvicorn==0.38.0
+fastapi==0.121.1
+pydantic==2.12.4
+fastapi-mcp==0.4.0
+mcp==1.22.0
