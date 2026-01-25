@@ -1,12 +1,10 @@
 from fastapi import APIRouter
-from fastapi.responses import FileResponse
 from schema.pydantic_system import (
     MessageResponse,
     MessageData,
     HealthResponse,
     HealthData,
 )
-from pathlib import Path
 
 
 router = APIRouter(tags=["System"])

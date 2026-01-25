@@ -1,4 +1,4 @@
-from typing import Optional, Any, Dict
+from typing import Any, Dict, List
 import uuid
 import requests
 import json
@@ -6,7 +6,7 @@ from datetime import timedelta
 from core.utils import EnvManager, standard_response
 from core.logging import setup_logging
 from core.exceptions import handle_exception
-from core.cache import cached_request, invalidate_cache
+from core.cache import cached_request
 from .data_model.model_auth import Country
 
 

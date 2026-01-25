@@ -7,8 +7,20 @@ import socket
 import argparse
 import logging
 import requests
+import requests.exceptions
 import signal
 from app.core.utils import RESET, BOLD, FG_RED, FG_WHITE, FG_GREEN, FG_YELLOW
+from app.core.logging import setup_logging
+
+logger = setup_logging(name="app.py", level="INFO")
+if os.name == "nt":
+    try:
+        import ctypes
+
+        ctypes.windll.kernel32.SetConsoleOutputCP(65001)
+        ctypes.windll.kernel32.SetConsoleCP(65001)
+    except (ImportError, AttributeError, OSError) as e:
+        logger.debug(f"Console encoding setup failed: {e}")
 
 if getattr(sys, "frozen", False):
     base_dir = sys._MEIPASS
@@ -48,8 +60,8 @@ def wait_for_server(port, timeout=10):
             r = requests.head(url, timeout=0.5)
             if r.status_code >= 200:
                 return True
-        except Exception:
-            pass
+        except (requests.exceptions.RequestException, OSError) as e:
+            logger.debug(f"Server not ready yet: {e}")
         time.sleep(0.1)
     return False
 
@@ -59,15 +71,15 @@ def open_browser(url):
         import webbrowser
 
         webbrowser.open(url, new=2)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to open browser: {e}")
 
 
 def _sigint_handler(signum, frame):
     try:
         server.should_exit = True
-    except NameError:
-        pass
+    except NameError as e:
+        logger.debug(f"Server shutdown signal before init: {e}")
     os._exit(0)
 
 

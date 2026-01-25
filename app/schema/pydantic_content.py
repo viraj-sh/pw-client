@@ -128,10 +128,6 @@ class DPPTestsData(BaseModel):
     tests: List[TestEntryModel] = Field(default_factory=list)
 
 
-from typing import Optional, Any, Dict, List
-from pydantic import BaseModel, Field
-
-
 class SolutionDescriptionModel(BaseModel):
     sol_id: Optional[str] = Field(None)
     sol_name: Optional[str] = Field(None)

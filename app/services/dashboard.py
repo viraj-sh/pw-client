@@ -3,7 +3,7 @@ from core.utils import EnvManager, standard_response
 from core.logging import setup_logging
 from core.cache import cached_request, invalidate_cache
 from core.exceptions import handle_exception
-from typing import Optional, Any, Dict, List
+from typing import Any, Dict, List
 from .data_model.model_dashboard import (
     LectureOverview,
     LectureSubjectStat,

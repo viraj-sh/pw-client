@@ -1,9 +1,4 @@
 repos:
-  - repo: https://github.com/psf/black
-    rev: 25.11.0
-    hooks:
-      - id: black
-
   - repo: local
     hooks:
       - id: ruff
@@ -18,14 +13,11 @@ repos:
         language: system
         types: [python]
 
-
-
-
   - repo: https://github.com/PyCQA/bandit
     rev: 1.9.2
     hooks:
       - id: bandit
-        args: ["-r", "app"]
+        args: ["-r", "./app"]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0

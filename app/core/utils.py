@@ -46,7 +46,7 @@ class EnvManager:
     def unset(cls, key: str) -> None:
         if cls.path.exists():
             lines = cls.path.read_text().splitlines()
-            new_lines = [l for l in lines if not l.startswith(f"{key}=")]
+            new_lines = [line for line in lines if not line.startswith(f"{key}=")]
             cls.path.write_text("\n".join(new_lines))
         os.environ.pop(key, None)
         cls._loaded = False

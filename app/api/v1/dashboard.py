@@ -1,14 +1,11 @@
-from fastapi import APIRouter, Query, Body, Path
+from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
-from typing import Optional
-from core.utils import standard_response
 from core.logging import setup_logging
 from core.exceptions import handle_exception
-from typing import Optional, Any, Dict
+from typing import Any, Dict
 from schema.pydantic_dashboard import (
     LectureOverviewResponse,
     LectureSubjectsResponse,
-    QuizOverviewDataModel,
     StandardResponseModel,
     QuizSubjectsResponse,
 )

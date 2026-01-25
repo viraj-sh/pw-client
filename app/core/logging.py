@@ -2,7 +2,6 @@ import logging
 import logging.config
 import os
 from pathlib import Path
-from pythonjsonlogger import jsonlogger
 
 
 def setup_logging(
