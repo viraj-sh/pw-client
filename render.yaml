@@ -1,8 +1,0 @@
-services:
-  - type: web
-    name: pw-client
-    env: python
-    branch: v3.0
-    buildCommand: pip install -r requirements.txt
-    startCommand: cd app && python -m uvicorn main:app --host 0.0.0.0 --port $PORT
-    plan: free

@@ -1,5 +1,0 @@
--r base.txt
-pytest==8.4.2
-black==25.9.0
-pyinstaller==6.16.0
-pre_commit==4.5.0
