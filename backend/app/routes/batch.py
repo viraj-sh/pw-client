@@ -16,18 +16,14 @@ from app.schemas.batch import (
 router = APIRouter()
 
 
-@router.get(
-    "/batches", response_model=list[BatchResponse], status_code=status.HTTP_200_OK
-)
+@router.get("", response_model=list[BatchResponse], status_code=status.HTTP_200_OK)
 async def fetch_batches(
     token: Annotated[HTTPAuthorizationCredentials, Depends(security)],
     client: HTTPClientDep,
-    amount: Literal["free", "paid"] = Query(default="paid"),
-    type: Literal["all"] = Query(default="all"),
     page: int = Query(default=1),
 ):
     try:
-        response = await batches(token, client, amount, type, page)
+        response = await batches(token, client, page)
         if response.status_code == 200:
             return [
                 BatchResponse(
@@ -66,11 +62,11 @@ async def fetch_batches(
 
 
 @router.get(
-    "/batches/{batch_id}",
+    "/{batch_id}",
     response_model=BatchDetailResponse,
     status_code=status.HTTP_200_OK,
 )
-async def fetch_batche_details(
+async def fetch_batch_details(
     token: Annotated[HTTPAuthorizationCredentials, Depends(security)],
     client: HTTPClientDep,
     batch_id: str,

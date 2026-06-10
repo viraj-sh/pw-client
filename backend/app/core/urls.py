@@ -15,5 +15,5 @@ class AuthURLs:
 
 
 class BatchURLs:
+    # GET_BATCHES = f"{API_BASE_URL}/batch-service/v4/batches/my-batches"
     GET_BATCHES = f"{API_BASE_URL}/batch-service/v1/batches/purchased-batches"
-    BATCH_BASE = f"{API_BASE_URL}/v3/batches/"
