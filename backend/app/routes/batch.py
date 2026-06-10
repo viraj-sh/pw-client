@@ -1,16 +1,17 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
-from typing import Annotated, Literal
+from typing import Annotated
 import httpx
 
 from app.core.http import HTTPClientDep, security
-from app.services.batch import batches, batch_details
+from app.services.batch import batches, subjects, chapters
 from app.schemas.batch import (
     BatchResponse,
     BatchDetailResponse,
     Fee,
     Subject,
     TeacherBrief,
+    TopicResponse,
 )
 
 router = APIRouter()
@@ -20,7 +21,7 @@ router = APIRouter()
 async def fetch_batches(
     token: Annotated[HTTPAuthorizationCredentials, Depends(security)],
     client: HTTPClientDep,
-    page: int = Query(default=1),
+    page: int = Query(default=1, ge=1),
 ):
     try:
         response = await batches(token, client, page)
@@ -66,13 +67,13 @@ async def fetch_batches(
     response_model=BatchDetailResponse,
     status_code=status.HTTP_200_OK,
 )
-async def fetch_batch_details(
+async def fetch_subjects(
     token: Annotated[HTTPAuthorizationCredentials, Depends(security)],
     client: HTTPClientDep,
     batch_id: str,
 ):
     try:
-        response = await batch_details(batch_id, token, client)
+        response = await subjects(batch_id, token, client)
         if response.status_code == 200:
             data = response.json().get("data")
             if not data:
@@ -121,6 +122,45 @@ async def fetch_batch_details(
                 fee=fee_obj,
                 subjects=subjects_list,
             )
+        return response.json()
+    except HTTPException:
+        raise
+    except httpx.TimeoutException:
+        raise HTTPException(504, "External API timed out")
+    except httpx.NetworkError:
+        raise HTTPException(502, "Could not reach external API")
+    except Exception as exc:
+        raise HTTPException(500, f"Unexpected error: {exc}")
+
+
+@router.get(
+    "/{batch_id}/{subject_id}",
+    response_model=list[TopicResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def fetch_topics(
+    token: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+    client: HTTPClientDep,
+    batch_id: str,
+    subject_id: str,
+    page: int = Query(default=1, ge=1),
+):
+    try:
+        response = await chapters(batch_id, subject_id, token, client, page)
+        if response.status_code == 200:
+            return [
+                TopicResponse(
+                    id=topic.get("_id"),
+                    name=topic.get("name"),
+                    slug=topic.get("slug"),
+                    order=topic.get("displayOrder"),
+                    notes=topic.get("notes"),
+                    exercises=topic.get("exercises"),
+                    videos=topic.get("videos"),
+                    lecture_videos=topic.get("lectureVideos"),
+                )
+                for topic in response.json().get("data")
+            ]
         return response.json()
     except HTTPException:
         raise

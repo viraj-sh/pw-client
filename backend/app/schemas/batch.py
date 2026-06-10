@@ -60,3 +60,14 @@ class BatchDetailResponse(BaseModel):
 
     class Config:
         populate_by_name = True
+
+
+class TopicResponse(BaseModel):
+    id: str
+    name: Optional[str] = Field(None)
+    slug: Optional[str] = Field(None)
+    order: Optional[int] = Field(None)
+    notes: Optional[int] = Field(None)
+    exercises: Optional[int] = Field(None)
+    videos: Optional[int] = Field(None)
+    lecture_videos: Optional[int] = Field(None)
