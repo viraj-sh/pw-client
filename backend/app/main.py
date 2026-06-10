@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 import httpx
 from contextlib import asynccontextmanager
 
-from app.routes import auth
+from app.routes import auth, batch
 from app.core.config import settings
 from app.core.http import http_state
 
@@ -51,6 +51,7 @@ def read_root():
 
 
 app.include_router(router=auth.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(router=batch.router, prefix="/api/v1/batch", tags=["batch"])
 
 if __name__ == "__main__":
     import uvicorn

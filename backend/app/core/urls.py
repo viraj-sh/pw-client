@@ -12,3 +12,8 @@ class AuthURLs:
     VERIFY_TOKEN = f"{API_BASE_URL}/v3/oauth/verify-token"
     LOGOUT = f"{API_BASE_URL}/v1/oauth/logout"
     APP_CONSTANTS = f"{STATIC_BASE_URL}/auth-fe/assets/json/app-constants.json"
+
+
+class BatchURLs:
+    GET_BATCHES = f"{API_BASE_URL}/batch-service/v1/batches/purchased-batches"
+    BATCH_BASE = f"{API_BASE_URL}/v3/batches/"

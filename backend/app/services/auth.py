@@ -1,9 +1,9 @@
 from typing import Literal
 from fastapi import Depends
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import HTTPAuthorizationCredentials
 from typing import Annotated
 
-from app.core.http import HTTPClientDep
+from app.core.http import HTTPClientDep, security
 from app.core.urls import AuthURLs
 from app.core.constants import (
     API_HEADERS,
@@ -13,8 +13,6 @@ from app.core.constants import (
     TOKEN_PAYLOAD_BASE,
 )
 from app.schemas.auth import OTPInput, LoginInput, ResendInput
-
-security = HTTPBearer()
 
 
 async def fetch_countires(client: HTTPClientDep):
