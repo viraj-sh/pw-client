@@ -48,7 +48,7 @@ class UserResponse(BaseModel):
 class LoginResponse(BaseModel):
     access_token: str
     refresh_token: str
-    expires_in: datetime
+    expires_in: str | None = None
     user: UserResponse
 
 

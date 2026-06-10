@@ -14,6 +14,7 @@ from app.services.auth import (
     token,
     refresh,
     reset,
+    exchange,
 )
 from app.schemas.auth import (
     CountriesResponse,
@@ -70,13 +71,12 @@ async def send_otp(
 
     try:
         response = await otp(smsType, input_data, client)
-        data = response.json()
         if response.status_code == 201:
-            return OTPResponse(success=data.get("success"))
+            return OTPResponse(success=response.json().get("success"))
         elif response.status_code == 400:
             raise HTTPException(
                 status_code=400,
-                detail=f"{data.get('error').get('status')} -> {data.get('error').get('message')}",
+                detail=f"{response.json().get('error').get('status')} -> {response.json().get('error').get('message')}",
             )
         return response.json()
     except HTTPException:
@@ -210,6 +210,57 @@ async def refresh_access_token(
                 expires_in=response.json().get("data").get("expires_in"),
             )
         return response.json()
+    except HTTPException:
+        raise
+    except httpx.TimeoutException:
+        raise HTTPException(504, "External API timed out")
+    except httpx.NetworkError:
+        raise HTTPException(502, "Could not reach external API")
+    except Exception as exc:
+        raise HTTPException(500, f"Unexpected error: {exc}")
+
+
+@router.post("/exchange", response_model=LoginResponse, status_code=status.HTTP_200_OK)
+async def exchange_token(
+    token: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+    client: HTTPClientDep,
+):
+    try:
+        response = await exchange(token, client)
+        data = response.json()
+        if response.status_code == 400:
+            raise HTTPException(
+                status_code=status.HTTP_412_PRECONDITION_FAILED,
+                detail=f"{response.json().get('error').get('status')} -> {response.json().get('error').get('message')}",
+            )
+        elif response.status_code == 412:
+            raise HTTPException(
+                status_code=status.HTTP_412_PRECONDITION_FAILED,
+                detail=f"{data.get('error').get('status')} -> {data.get('error').get('message')}",
+            )
+        elif response.status_code == 404:
+            raise HTTPException(
+                status_code=status.HTTP_412_PRECONDITION_FAILED,
+                detail=f"{data.get('error').get('status')} -> {data.get('error').get('message')}",
+            )
+        elif response.status_code == 200:
+            if data.get("success"):
+                return LoginResponse(
+                    access_token=data.get("data").get("access_token"),
+                    refresh_token=data.get("data").get("refresh_token"),
+                    expires_in=data.get("data").get("expires_in"),
+                    user=UserResponse(
+                        firstName=data.get("data").get("user").get("firstName"),
+                        lastName=data.get("data").get("user").get("lastName"),
+                        email=data.get("data").get("user").get("email"),
+                    ),
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail="unknown error"
+                )
+        return data
+
     except HTTPException:
         raise
     except httpx.TimeoutException:

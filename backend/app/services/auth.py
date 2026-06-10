@@ -107,6 +107,15 @@ async def refresh(
     )
 
 
+async def exchange(
+    token: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+    client: HTTPClientDep,
+):
+    return await client.get(
+        url=AuthURLs.EXCHANGE_TOKEN, headers=auth_headers(token.credentials)
+    )
+
+
 async def verify(
     token: Annotated[HTTPAuthorizationCredentials, Depends(security)],
     client: HTTPClientDep,
