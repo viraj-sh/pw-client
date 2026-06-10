@@ -50,7 +50,7 @@ def read_root():
     )
 
 
-app.include_router(router=auth.router, tags=["auth"])
+app.include_router(router=auth.router, prefix="/api/v1/auth", tags=["auth"])
 
 if __name__ == "__main__":
     import uvicorn

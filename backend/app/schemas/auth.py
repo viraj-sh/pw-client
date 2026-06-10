@@ -9,6 +9,10 @@ class CountriesResponse(BaseModel):
     dial_code: str
 
 
+class ResendInput(BaseModel):
+    mobile: str = Field(min_length=10)
+
+
 class OTPInput(BaseModel):
     phone_no: str = Field(min_length=10)
     country_code: str
@@ -21,7 +25,7 @@ class OTPResponse(BaseModel):
 class VerifyResponse(BaseModel):
     success: bool
     is_verified: bool
-    message: str | None = None
+    # message: str | None = None
 
 
 class LogoutResponse(BaseModel):
@@ -30,7 +34,8 @@ class LogoutResponse(BaseModel):
 
 class LoginInput(BaseModel):
     username: str = Field(min_length=10)
-    otp: str = Field(min_length=6)
+    otp: str | None = Field(default=None, min_length=6)
+    password: str | None = Field(default=None)
 
 
 class UserResponse(BaseModel):
@@ -45,3 +50,9 @@ class LoginResponse(BaseModel):
     refresh_token: str
     expires_in: datetime
     user: UserResponse
+
+
+class RefreshResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    expires_in: datetime
