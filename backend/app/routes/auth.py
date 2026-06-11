@@ -143,7 +143,7 @@ async def login_user(
                 return LoginResponse(
                     access_token=data.get("data").get("access_token"),
                     refresh_token=data.get("data").get("refresh_token"),
-                    expires_in=data.get("data").get("expires_in"),
+                    expires_in=str(data.get("data").get("expires_in")),
                     user=UserResponse(
                         firstName=data.get("data").get("user").get("firstName"),
                         lastName=data.get("data").get("user").get("lastName"),

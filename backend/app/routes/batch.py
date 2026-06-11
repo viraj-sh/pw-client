@@ -14,6 +14,7 @@ from app.schemas.batch import (
     TopicResponse,
     NotesResponse,
     LectureResponse,
+    QuizResponse,
 )
 
 router = APIRouter()
@@ -186,11 +187,12 @@ async def fetch_content(
     chapter_id: str,
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1),
-    type: Literal["all", "notes", "lectures", "dpp_pdf"] = Query(default="all"),
+    type: Literal["all", "notes", "lectures", "dpp_pdf", "dpp"] = Query(default="all"),
+    page: int = Query(default=1, ge=1),
 ):
     try:
         response = await content(
-            batch_id, subject_id, chapter_id, token, client, skip, limit, type
+            batch_id, subject_id, chapter_id, token, client, skip, limit, page, type
         )
         if response.status_code == 200:
             if type == "notes" or type == "dpp_pdf":
@@ -333,6 +335,41 @@ async def fetch_content(
                             )
                         )
                 return results
+            elif type == "dpp":
+                response = await content(
+                    batch_id,
+                    subject_id,
+                    chapter_id,
+                    token,
+                    client,
+                    skip,
+                    limit,
+                    page,
+                    type,
+                )
+                return [
+                    QuizResponse(
+                        id=quiz.get("dppQuizDetails").get("test").get("_id"),
+                        type=quiz.get("type"),
+                        order=quiz.get("dppQuizDetails")
+                        .get("test")
+                        .get("displayOrder"),
+                        name=quiz.get("dppQuizDetails").get("test").get("name"),
+                        total_marks=quiz.get("dppQuizDetails")
+                        .get("test")
+                        .get("totalMarks"),
+                        total_questions=quiz.get("dppQuizDetails")
+                        .get("test")
+                        .get("totalQuestions"),
+                        max_duration=quiz.get("dppQuizDetails")
+                        .get("test")
+                        .get("totalQuestions"),
+                        date=quiz.get("dppQuizDetails").get("test").get("createdAt"),
+                        tag=quiz.get("dppQuizDetails").get("tag"),
+                        is_reattempted=quiz.get("dppQuizDetails").get("isReattempted"),
+                    )
+                    for quiz in response.json().get("data")
+                ]
         return response.json()
     except HTTPException:
         raise

@@ -99,3 +99,16 @@ class LectureResponse(BaseModel):
     duration: Optional[str] = Field(None)
     is_drm_protectured: Optional[bool] = Field(None)
     find_key: Optional[str] = Field(None)
+
+
+class QuizResponse(BaseModel):
+    id: str
+    type: str
+    order: Optional[int] = Field(None)
+    name: Optional[str] = Field(None)
+    total_marks: Optional[int] = Field(None)
+    total_questions: Optional[int] = Field(None)
+    max_duration: Optional[int] = Field(None)
+    date: Optional[str] = Field(None)
+    tag: Optional[str] = Field(None)
+    is_reattempted: Optional[bool] = Field(None)

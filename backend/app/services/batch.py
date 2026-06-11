@@ -52,16 +52,31 @@ async def content(
     client: HTTPClientDep,
     skip: int = 0,
     limit: int = 20,
-    type: Literal["all", "notes", "lectures", "dpp_pdf"] = "all",
+    page: int = 1,
+    type: Literal["all", "notes", "lectures", "dpp_pdf", "dpp"] = "all",
 ):
-    url = f"{API_BASE_URL}/batch-service/v3/batch-subject-schedules/{batch_id}/subject/{sub_id}/contents"
-    params = {
-        "skip": skip,
-        "limit": limit,
-        "contentType": type.upper(),
-        "tagId": chapter_id,
-        "contentFilter": "ALL",
-    }
-    return await client.get(
-        url=url, params=params, headers=auth_headers(token.credentials)
-    )
+    if type == "dpp":
+        url = f"{API_BASE_URL}/v3/test-service/tests/new-dpp-list"
+        params = {
+            "page": page,
+            "limit": limit,
+            "batchId": batch_id,
+            "batchSubjectId": sub_id,
+            "chapterId": chapter_id,
+            "dppType": "ALL",
+        }
+        return await client.get(
+            url=url, params=params, headers=auth_headers(token.credentials)
+        )
+    else:
+        url = f"{API_BASE_URL}/batch-service/v3/batch-subject-schedules/{batch_id}/subject/{sub_id}/contents"
+        params = {
+            "skip": skip,
+            "limit": limit,
+            "contentType": type.upper(),
+            "tagId": chapter_id,
+            "contentFilter": "ALL",
+        }
+        return await client.get(
+            url=url, params=params, headers=auth_headers(token.credentials)
+        )
