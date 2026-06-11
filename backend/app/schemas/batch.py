@@ -71,3 +71,31 @@ class TopicResponse(BaseModel):
     exercises: Optional[int] = Field(None)
     videos: Optional[int] = Field(None)
     lecture_videos: Optional[int] = Field(None)
+
+
+class NotesResponse(BaseModel):
+    type: str
+    id: str
+    status: Optional[str] = Field(None)
+    is_dpp_notes: Optional[bool] = Field(None)
+    topic: Optional[str] = Field(None)
+    note: Optional[str] = Field(None)
+    url: Optional[str] = Field(None)
+    file_name: Optional[str] = Field(None)
+    created_at: Optional[str] = Field(None)
+
+
+class LectureResponse(BaseModel):
+    type: str
+    id: str
+    dpp_count: Optional[int] = Field(None)
+    date: Optional[str] = Field(None)
+    topic: Optional[str] = Field(None)
+    slug: Optional[str] = Field(None)
+    status: Optional[str] = Field(None)
+    video_id: Optional[str] = Field(None)
+    video_name: Optional[str] = Field(None)
+    video_url: Optional[str] = Field(None)
+    duration: Optional[str] = Field(None)
+    is_drm_protectured: Optional[bool] = Field(None)
+    find_key: Optional[str] = Field(None)

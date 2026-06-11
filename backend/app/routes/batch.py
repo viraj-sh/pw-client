@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
-from typing import Annotated
+from typing import Annotated, Literal
 import httpx
 
 from app.core.http import HTTPClientDep, security
-from app.services.batch import batches, subjects, chapters
+from app.services.batch import batches, subjects, chapters, content
 from app.schemas.batch import (
     BatchResponse,
     BatchDetailResponse,
@@ -12,6 +12,8 @@ from app.schemas.batch import (
     Subject,
     TeacherBrief,
     TopicResponse,
+    NotesResponse,
+    LectureResponse,
 )
 
 router = APIRouter()
@@ -161,6 +163,176 @@ async def fetch_topics(
                 )
                 for topic in response.json().get("data")
             ]
+        return response.json()
+    except HTTPException:
+        raise
+    except httpx.TimeoutException:
+        raise HTTPException(504, "External API timed out")
+    except httpx.NetworkError:
+        raise HTTPException(502, "Could not reach external API")
+    except Exception as exc:
+        raise HTTPException(500, f"Unexpected error: {exc}")
+
+
+@router.get(
+    "/{batch_id}/{subject_id}/{chapter_id}",
+    status_code=status.HTTP_200_OK,
+)
+async def fetch_content(
+    token: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+    client: HTTPClientDep,
+    batch_id: str,
+    subject_id: str,
+    chapter_id: str,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1),
+    type: Literal["all", "notes", "lectures", "dpp_pdf"] = Query(default="all"),
+):
+    try:
+        response = await content(
+            batch_id, subject_id, chapter_id, token, client, skip, limit, type
+        )
+        if response.status_code == 200:
+            if type == "notes" or type == "dpp_pdf":
+                data_list = response.json().get("data", [])
+                return [
+                    NotesResponse(
+                        type=note.get("type"),
+                        id=note.get("data", {}).get("_id"),
+                        status=note.get("data", {}).get("status"),
+                        is_dpp_notes=note.get("data", {}).get("isDPPNotes"),
+                        topic=note["data"]["homeworkIds"][0].get("topic")
+                        if note.get("data", {}).get("homeworkIds")
+                        else None,
+                        note=note["data"]["homeworkIds"][0].get("note")
+                        if note.get("data", {}).get("homeworkIds")
+                        else None,
+                        url=f"{note['data']['homeworkIds'][0]['attachmentIds'][-1]['baseUrl']}{note['data']['homeworkIds'][0]['attachmentIds'][-1]['key']}",
+                        file_name=(
+                            note["data"]["homeworkIds"][0]["attachmentIds"][-1].get(
+                                "name"
+                            )
+                            if note.get("data", {}).get("homeworkIds")
+                            and note["data"]["homeworkIds"][0].get("attachmentIds")
+                            else None
+                        ),
+                        created_at=(
+                            note["data"]["homeworkIds"][0]["attachmentIds"][-1].get(
+                                "createdAt"
+                            )
+                            if note.get("data", {}).get("homeworkIds")
+                            and note["data"]["homeworkIds"][0].get("attachmentIds")
+                            else None
+                        ),
+                    )
+                    for note in data_list
+                    if note.get("data", {}).get("homeworkIds")
+                ]
+            elif type == "lectures":
+                data_list = response.json().get("data", [])
+                return [
+                    LectureResponse(
+                        type=item.get("type"),  # "LECTURE"
+                        id=item.get("data", {}).get("_id"),
+                        dpp_count=item.get("data", {}).get("dppCount"),
+                        date=item.get("data", {}).get("date"),
+                        topic=item.get("data", {}).get("topic"),
+                        slug=item.get("data", {}).get("slug"),
+                        status=item.get("data", {}).get("status"),
+                        video_id=item.get("data", {})
+                        .get("videoDetails", {})
+                        .get("_id"),
+                        video_name=item.get("data", {})
+                        .get("videoDetails", {})
+                        .get("name"),
+                        video_url=item.get("data", {})
+                        .get("videoDetails", {})
+                        .get("videoUrl"),
+                        duration=item.get("data", {})
+                        .get("videoDetails", {})
+                        .get("duration"),
+                        is_drm_protectured=item.get("data", {})
+                        .get("videoDetails", {})
+                        .get("drmProtected"),
+                        find_key=item.get("data", {})
+                        .get("videoDetails", {})
+                        .get("findKey"),
+                    )
+                    for item in data_list
+                ]
+            elif type == "all":
+                data_list = response.json().get("data", [])
+                results = []
+                for item in data_list:
+                    item_type = item.get("type")
+                    if item_type in ("NOTES", "DPP_PDF"):
+                        note = item
+                        results.append(
+                            NotesResponse(
+                                type=note.get("type"),
+                                id=note.get("data", {}).get("_id"),
+                                status=note.get("data", {}).get("status"),
+                                is_dpp_notes=note.get("data", {}).get("isDPPNotes"),
+                                topic=note["data"]["homeworkIds"][0].get("topic")
+                                if note.get("data", {}).get("homeworkIds")
+                                else None,
+                                note=note["data"]["homeworkIds"][0].get("note")
+                                if note.get("data", {}).get("homeworkIds")
+                                else None,
+                                url=f"{note['data']['homeworkIds'][0]['attachmentIds'][-1]['baseUrl']}{note['data']['homeworkIds'][0]['attachmentIds'][-1]['key']}",
+                                file_name=(
+                                    note["data"]["homeworkIds"][0]["attachmentIds"][
+                                        -1
+                                    ].get("name")
+                                    if note.get("data", {}).get("homeworkIds")
+                                    and note["data"]["homeworkIds"][0].get(
+                                        "attachmentIds"
+                                    )
+                                    else None
+                                ),
+                                created_at=(
+                                    note["data"]["homeworkIds"][0]["attachmentIds"][
+                                        -1
+                                    ].get("createdAt")
+                                    if note.get("data", {}).get("homeworkIds")
+                                    and note["data"]["homeworkIds"][0].get(
+                                        "attachmentIds"
+                                    )
+                                    else None
+                                ),
+                            )
+                        )
+                    elif item_type == "LECTURE":
+                        results.append(
+                            LectureResponse(
+                                type=item.get("type"),
+                                id=item.get("data", {}).get("_id"),
+                                dpp_count=item.get("data", {}).get("dppCount"),
+                                date=item.get("data", {}).get("date"),
+                                topic=item.get("data", {}).get("topic"),
+                                slug=item.get("data", {}).get("slug"),
+                                status=item.get("data", {}).get("status"),
+                                video_id=item.get("data", {})
+                                .get("videoDetails", {})
+                                .get("_id"),
+                                video_name=item.get("data", {})
+                                .get("videoDetails", {})
+                                .get("name"),
+                                video_url=item.get("data", {})
+                                .get("videoDetails", {})
+                                .get("videoUrl"),
+                                duration=item.get("data", {})
+                                .get("videoDetails", {})
+                                .get("duration"),
+                                is_drm_protectured=item.get("data", {})
+                                .get("videoDetails", {})
+                                .get("drmProtected"),
+                                find_key=item.get("data", {})
+                                .get("videoDetails", {})
+                                .get("findKey"),
+                            )
+                        )
+                return results
         return response.json()
     except HTTPException:
         raise

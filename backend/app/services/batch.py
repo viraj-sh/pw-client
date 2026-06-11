@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal
 from fastapi.security import HTTPAuthorizationCredentials
 from fastapi import Depends
 
@@ -41,4 +41,27 @@ async def chapters(
         url=f"{API_BASE_URL}/v2/batches/{batch_id}/subject/{sub_id}/topics",
         params={"page": page},
         headers=auth_headers(token.credentials),
+    )
+
+
+async def content(
+    batch_id: str,
+    sub_id: str,
+    chapter_id: str,
+    token: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+    client: HTTPClientDep,
+    skip: int = 0,
+    limit: int = 20,
+    type: Literal["all", "notes", "lectures", "dpp_pdf"] = "all",
+):
+    url = f"{API_BASE_URL}/batch-service/v3/batch-subject-schedules/{batch_id}/subject/{sub_id}/contents"
+    params = {
+        "skip": skip,
+        "limit": limit,
+        "contentType": type.upper(),
+        "tagId": chapter_id,
+        "contentFilter": "ALL",
+    }
+    return await client.get(
+        url=url, params=params, headers=auth_headers(token.credentials)
     )
