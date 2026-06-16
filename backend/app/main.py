@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 import httpx
 from contextlib import asynccontextmanager
 
-from app.routes import auth, batch, ann, dashboard
+from app.routes import auth, batch, ann, dashboard, quiz
 from app.core.config import settings
 from app.core.http import http_state
 
@@ -55,6 +55,7 @@ app.include_router(router=batch.router, prefix="/api/v1/batch", tags=["batch"])
 app.include_router(
     router=ann.router, prefix="/api/v1/announcement", tags=["announcement"]
 )
+app.include_router(router=quiz.router, prefix="/api/v1/quiz", tags=["quiz"])
 app.include_router(
     router=dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"]
 )
