@@ -1,11 +1,13 @@
-from fastapi import FastAPI, status
-from fastapi.responses import JSONResponse
-import httpx
 from contextlib import asynccontextmanager
 
-from app.routes import auth, batch, ann, dashboard, quiz
+import httpx
+from fastapi import FastAPI, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
 from app.core.config import settings
 from app.core.http import http_state
+from app.routes import ann, auth, batch, dashboard, quiz
 
 
 @asynccontextmanager
@@ -38,16 +40,21 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(
+    middleware_class=CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/", status_code=status.HTTP_200_OK, tags=["system"])
 def read_root():
-    return JSONResponse(
-        {
-            "name": "pw-client-api",
-            "version": settings.VERSION,
-            "docs_url": "https://github.com/viraj-sh/pw-client",
-        }
-    )
+    return JSONResponse({
+        "name": "pw-client-api",
+        "version": settings.VERSION,
+        "docs_url": "https://github.com/viraj-sh/pw-client",
+    })
 
 
 app.include_router(router=auth.router, prefix="/api/v1/auth", tags=["auth"])

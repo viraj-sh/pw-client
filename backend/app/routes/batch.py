@@ -1,21 +1,22 @@
-from fastapi import APIRouter, Depends, Query, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials
 from typing import Annotated, Literal
+
 import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.security import HTTPAuthorizationCredentials
 
 from app.core.http import HTTPClientDep, security
-from app.services.batch import batches, subjects, chapters, content
 from app.schemas.batch import (
-    BatchResponse,
     BatchDetailResponse,
+    BatchResponse,
     Fee,
+    LectureResponse,
+    NotesResponse,
+    QuizResponse,
     Subject,
     TeacherBrief,
     TopicResponse,
-    NotesResponse,
-    LectureResponse,
-    QuizResponse,
 )
+from app.services.batch import batches, chapters, content, subjects
 
 router = APIRouter()
 
@@ -241,22 +242,28 @@ async def fetch_content(
                         topic=item.get("data", {}).get("topic"),
                         slug=item.get("data", {}).get("slug"),
                         status=item.get("data", {}).get("status"),
-                        video_id=item.get("data", {})
+                        video_id=item
+                        .get("data", {})
                         .get("videoDetails", {})
                         .get("_id"),
-                        video_name=item.get("data", {})
+                        video_name=item
+                        .get("data", {})
                         .get("videoDetails", {})
                         .get("name"),
-                        video_url=item.get("data", {})
+                        video_url=item
+                        .get("data", {})
                         .get("videoDetails", {})
                         .get("videoUrl"),
-                        duration=item.get("data", {})
+                        duration=item
+                        .get("data", {})
                         .get("videoDetails", {})
                         .get("duration"),
-                        is_drm_protectured=item.get("data", {})
+                        is_drm_protectured=item
+                        .get("data", {})
                         .get("videoDetails", {})
                         .get("drmProtected"),
-                        find_key=item.get("data", {})
+                        find_key=item
+                        .get("data", {})
                         .get("videoDetails", {})
                         .get("findKey"),
                     )
@@ -314,22 +321,28 @@ async def fetch_content(
                                 topic=item.get("data", {}).get("topic"),
                                 slug=item.get("data", {}).get("slug"),
                                 status=item.get("data", {}).get("status"),
-                                video_id=item.get("data", {})
+                                video_id=item
+                                .get("data", {})
                                 .get("videoDetails", {})
                                 .get("_id"),
-                                video_name=item.get("data", {})
+                                video_name=item
+                                .get("data", {})
                                 .get("videoDetails", {})
                                 .get("name"),
-                                video_url=item.get("data", {})
+                                video_url=item
+                                .get("data", {})
                                 .get("videoDetails", {})
                                 .get("videoUrl"),
-                                duration=item.get("data", {})
+                                duration=item
+                                .get("data", {})
                                 .get("videoDetails", {})
                                 .get("duration"),
-                                is_drm_protectured=item.get("data", {})
+                                is_drm_protectured=item
+                                .get("data", {})
                                 .get("videoDetails", {})
                                 .get("drmProtected"),
-                                find_key=item.get("data", {})
+                                find_key=item
+                                .get("data", {})
                                 .get("videoDetails", {})
                                 .get("findKey"),
                             )
@@ -351,17 +364,21 @@ async def fetch_content(
                     QuizResponse(
                         id=quiz.get("dppQuizDetails").get("test").get("_id"),
                         type=quiz.get("type"),
-                        order=quiz.get("dppQuizDetails")
+                        order=quiz
+                        .get("dppQuizDetails")
                         .get("test")
                         .get("displayOrder"),
                         name=quiz.get("dppQuizDetails").get("test").get("name"),
-                        total_marks=quiz.get("dppQuizDetails")
+                        total_marks=quiz
+                        .get("dppQuizDetails")
                         .get("test")
                         .get("totalMarks"),
-                        total_questions=quiz.get("dppQuizDetails")
+                        total_questions=quiz
+                        .get("dppQuizDetails")
                         .get("test")
                         .get("totalQuestions"),
-                        max_duration=quiz.get("dppQuizDetails")
+                        max_duration=quiz
+                        .get("dppQuizDetails")
                         .get("test")
                         .get("totalQuestions"),
                         date=quiz.get("dppQuizDetails").get("test").get("createdAt"),

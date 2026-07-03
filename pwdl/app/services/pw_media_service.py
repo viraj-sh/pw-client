@@ -1,23 +1,29 @@
 import base64
-import httpx
 from typing import Optional
+
+import httpx
+
 from app.core.config import get_settings
-from app.core.exceptions import UpstreamAPIException, MediaResolutionException
+from app.core.exceptions import MediaResolutionException, UpstreamAPIException
 from app.core.logging import get_logger
+from app.core.utils import extract_org_and_role_from_token
 
 logger = get_logger("pw_media_service")
 settings = get_settings()
 
+
 def _xor_encrypt(data: str, token: str) -> list[int]:
     return [ord(c) ^ ord(token[i % len(token)]) for i, c in enumerate(data)]
+
 
 def _insert_zeros(hex_string: str) -> str:
     result = "00"
     for i in range(0, len(hex_string), 2):
-        result += hex_string[i:i+2]
+        result += hex_string[i : i + 2]
         if i + 2 < len(hex_string):
             result += "00"
     return result
+
 
 def _decrypt_otp(otp_b64: str, token: str) -> str:
     decoded_bytes = base64.b64decode(otp_b64)
@@ -28,11 +34,9 @@ def _decrypt_otp(otp_b64: str, token: str) -> str:
     )
     return result
 
+
 async def fetch_decryption_key(
-    client: httpx.AsyncClient,
-    token: str,
-    random_id: str,
-    kid: str
+    client: httpx.AsyncClient, token: str, random_id: str, kid: str
 ) -> str:
     logger.info(f"Initiating decryption key exchange for KID={kid}")
     try:
@@ -43,37 +47,41 @@ async def fetch_decryption_key(
         encoded_otp_key = _insert_zeros(encoded_otp_key_step1)
 
         url = f"{settings.PW_API_BASE_URL}/v1/videos/get-otp"
-        params = {
-            "key": encoded_otp_key,
-            "isEncoded": "true"
-        }
+        params = {"key": encoded_otp_key, "isEncoded": "true"}
+        org_id, role = extract_org_and_role_from_token(token)
         headers = {
             "accept": "*/*",
             "authorization": f"Bearer {token}",
-            "client-id": "5eb393ee95fab7468a79d189",
+            "client-id": org_id,
             "client-type": "WEB",
             "content-type": "application/json",
-            "randomid": random_id
+            "randomid": random_id,
+            "organizationId": org_id,
+            "roles": role,
         }
 
         response = await client.get(
             url,
             params=params,
             headers=headers,
-            timeout=settings.REQUEST_TIMEOUT_SECONDS
+            timeout=settings.REQUEST_TIMEOUT_SECONDS,
         )
         if response.is_error:
-            logger.error(f"Failed to fetch OTP from get-otp endpoint. Status: {response.status_code}")
+            logger.error(
+                f"Failed to fetch OTP from get-otp endpoint. Status: {response.status_code}"
+            )
             raise UpstreamAPIException(
                 message="Failed to fetch OTP from get-otp endpoint during key exchange",
                 status_code=response.status_code,
-                detail=response.text
+                detail=response.text,
             )
 
         data = response.json()
         otp_payload = data.get("data", {}).get("otp")
         if not otp_payload:
-            logger.error("Response from get-otp did not contain otp field in data payload")
+            logger.error(
+                "Response from get-otp did not contain otp field in data payload"
+            )
             raise MediaResolutionException(
                 "Upstream key exchange response did not contain OTP field"
             )
@@ -86,7 +94,7 @@ async def fetch_decryption_key(
         logger.error(f"HTTP request to key exchange API failed: {exc}")
         raise UpstreamAPIException(
             message=f"Network error communicating with upstream key exchange API: {exc}",
-            status_code=500
+            status_code=500,
         )
     except Exception as exc:
         if isinstance(exc, (UpstreamAPIException, MediaResolutionException)):
