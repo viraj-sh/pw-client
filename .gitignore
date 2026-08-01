@@ -2,4 +2,5 @@ venv
 test.json
 data
 nohup.out
-core/__pycache__
+__pycache__/
+downloads/
