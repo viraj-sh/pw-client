@@ -12,7 +12,7 @@ load_dotenv()
 
 OUT_DIR = "downloads"
 TOKEN_FILE = os.path.join("data", "token.txt")
-ALL_TYPES = ["Notes", "DPP", "Quiz", "Announcements", "Lectures"]
+ALL_TYPES = ["Notes", "DPP", "Quiz", "Announcements", "Lectures", "Videos"]
 
 
 def load_token():

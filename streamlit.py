@@ -1,4 +1,5 @@
 import os
+import threading
 import time
 from collections import Counter
 
@@ -13,19 +14,21 @@ from core.content import (
 from core.downloader import build_download_jobs, run_downloads, zip_dir, _safe_filename
 from core.generate_token import send_otp, get_token
 from core.utils import verify_token
+from core.video import check_dependencies, download_video
 
 load_dotenv()
 
 DATA_DIR = "data"
 OUT_DIR = "downloads"
 TOKEN_FILE = os.path.join(DATA_DIR, "token.txt")
-ALL_TYPES = ["Notes", "DPP", "Quiz", "Announcements", "Lectures"]
+ALL_TYPES = ["Notes", "DPP", "Quiz", "Announcements", "Lectures", "Videos"]
 TYPE_HELP = {
     "Notes": "Class notes · PDFs",
     "DPP": "Daily practice problems · PDFs",
     "Quiz": "Attempted DPP quizzes with solutions · HTML",
     "Announcements": "Batch announcements & attachments",
     "Lectures": "Lecture listing only (DRM-protected videos)",
+    "Videos": "Download lecture videos as MP4 (needs ffmpeg + mp4decrypt)",
 }
 
 CSS = """
@@ -174,8 +177,8 @@ def _render_downloader(token, batch):
     sel_types = st.multiselect(
         "Content",
         ALL_TYPES,
-        default=ALL_TYPES,
-        help="Lectures are DRM-protected; only a listing is saved.",
+        default=[t for t in ALL_TYPES if t != "Videos"],
+        help="Videos downloads need ffmpeg and mp4decrypt (Bento4) on PATH.",
     )
     if sel_types:
         for t in ALL_TYPES:
@@ -205,11 +208,12 @@ def _render_downloader(token, batch):
     if jobs is not None:
         kinds = _jobs_summary(jobs)
         total = len(jobs)
-        m1, m2, m3, m4 = st.columns(4)
+        m1, m2, m3, m4, m5 = st.columns(5)
         m1.metric("Files", kinds.get("file", 0))
         m2.metric("Quizzes", kinds.get("quiz", 0))
         m3.metric("Lecture lists", kinds.get("lectures", 0))
-        m4.metric("Total items", total)
+        m4.metric("Videos", kinds.get("video", 0))
+        m5.metric("Total items", total)
         st.caption(f"Will be saved under `downloads/{_safe_filename(batch_info.get('name'))}`")
 
     if col_dl.button(
@@ -268,6 +272,17 @@ def _render_downloader(token, batch):
 
 
 # ---------------- Browse ----------------
+
+def _thread_safe_progress(placeholder):
+    """Progress callback that only touches Streamlit from the main thread."""
+
+    def on_progress(done, total, message=""):
+        if threading.current_thread() is threading.main_thread():
+            text = f"{message} {done}/{total}" if message else f"{done}/{total}"
+            placeholder.progress(done / total if total else 1.0, text=text)
+
+    return on_progress
+
 
 def _render_attachments(entries, prefix):
     if not entries:
@@ -374,9 +389,51 @@ def _render_browser(token, batch):
         if not lectures:
             st.info("No lectures for this topic.")
         else:
+            ffmpeg, mp4decrypt = check_dependencies()
+            if not ffmpeg:
+                st.warning("`ffmpeg` not found on PATH — video downloads are disabled.")
+            elif mp4decrypt is None:
+                st.warning(
+                    "`mp4decrypt` (Bento4) not found on PATH — DRM-protected "
+                    "lectures will fail to decrypt."
+                )
             for L in lectures:
-                st.markdown(f"**{L.get('topic')}** · {L.get('duration')}")
-            st.caption("Lectures are DRM-protected; use the PW app for offline viewing.")
+                c1, c2 = st.columns([6, 3])
+                c1.markdown(f"**{L.get('topic')}** · {L.get('duration')}")
+                if c2.button(
+                    "Download MP4",
+                    key=f"dlv{L.get('_id')}",
+                    disabled=not ffmpeg,
+                    use_container_width=True,
+                ):
+                    prog = st.progress(0.0, text="Starting...")
+                    fname = _safe_filename(L.get("topic")) + ".mp4"
+                    dest = os.path.join(
+                        OUT_DIR,
+                        _safe_filename(batch_info.get("name")),
+                        _safe_filename(subject.get("subject")),
+                        _safe_filename(topic.get("name")),
+                        "Videos",
+                        fname,
+                    )
+                    with st.spinner("Downloading lecture…"):
+                        ok, detail = download_video(
+                            token,
+                            L,
+                            slug,
+                            dest,
+                            ffmpeg=ffmpeg,
+                            mp4decrypt=mp4decrypt,
+                            progress=_thread_safe_progress(prog),
+                        )
+                    if ok:
+                        st.success(f"Saved: `{detail}`")
+                    else:
+                        st.error(f"Download failed: {detail}")
+            st.caption(
+                "DRM-protected lectures need `ffmpeg` and `mp4decrypt` (Bento4) "
+                "on PATH to decrypt and merge."
+            )
 
 
 # ---------------- App ----------------

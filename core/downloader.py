@@ -29,7 +29,7 @@ def build_download_jobs(token, batch, subject_ids, types, out_dir):
 
     `batch` is a tree entry: {"batch": {...}, "subjects": {...}}.
 
-    Returns jobs: list of dicts with kinds 'file', 'quiz', 'lectures'.
+    Returns jobs: list of dicts with kinds 'file', 'quiz', 'lectures', 'video'.
     """
     types = {t.lower() for t in types}
     jobs = []
@@ -101,6 +101,20 @@ def build_download_jobs(token, batch, subject_ids, types, out_dir):
                         "path": os.path.join(topic_base, "lectures.txt"),
                     })
 
+            if "videos" in types:
+                lectures = fetch_lectures(token, slug, subj_slug, topic_slug)
+                for L in lectures:
+                    jobs.append({
+                        "kind": "video",
+                        "label": f"Videos/{topic.get('name')}/{L.get('topic')}",
+                        "token": token,
+                        "lecture": L,
+                        "batch_slug": slug,
+                        "dest": os.path.join(
+                            topic_base, "Videos", _safe_filename(L.get("topic")) + ".mp4"
+                        ),
+                    })
+
     if "announcements" in types and batch_info.get("_id"):
         ann_base = os.path.join(base, "Announcements")
         for ann in fetch_announcements(token, batch_info.get("_id")):
@@ -144,6 +158,22 @@ def _handle_job(job):
             return True, job["path"]
         except Exception as e:
             return False, f"lecture manifest error: {e}"
+    if job["kind"] == "video":
+        from core.video import check_dependencies, download_video
+
+        ffmpeg, mp4decrypt = check_dependencies()
+        if not ffmpeg:
+            return False, "ffmpeg not found on PATH (required for videos)"
+        if (job["lecture"] or {}).get("drmProtected") and not mp4decrypt:
+            return False, "mp4decrypt not found on PATH (required for DRM videos)"
+        return download_video(
+            job["token"],
+            job["lecture"],
+            job["batch_slug"],
+            job["dest"],
+            ffmpeg=ffmpeg,
+            mp4decrypt=mp4decrypt,
+        )
     return False, "unknown job kind"
 
 

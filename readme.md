@@ -11,7 +11,8 @@ PW Extractor is a dashboard app for students of [Physics Wallah (PW)](https://ww
   - DPP — Daily practice problems (PDF)
   - DPP Quiz with solutions (self-contained HTML, question + solution images embedded)
   - Announcements with attachments
-  - Lectures (listing only — streams are DRM-protected)
+  - Lectures (listing only)
+  - Videos (MP4) — downloads lecture videos from your enrolled batches. DASH segments are fetched directly and, for DRM-protected lectures, decrypted with `mp4decrypt` (Bento4) and merged with `ffmpeg`.
 - **Announcement notifications** — watch for new announcements and push to Discord, Telegram, or Email.
 - **Two interfaces** — Streamlit web app and a CLI.
 
@@ -46,7 +47,14 @@ PW Extractor is a dashboard app for students of [Physics Wallah (PW)](https://ww
    pip install -r requirements.txt
    ```
 
-4. Run the app:
+4. Install the external binaries used for video downloads (videos only):
+
+   ```
+   # ffmpeg — https://ffmpeg.org/download.html
+   # mp4decrypt (Bento4) — https://www.bento4.com/downloads/  (needed for DRM-protected lectures)
+   ```
+
+5. Run the app:
 
    ```
    streamlit run streamlit.py
@@ -71,8 +79,8 @@ The token can be:
 ## Web App Usage
 
 - **Login** — paste an existing token, or log in with phone + OTP.
-- **Download tab** — pick a batch (sidebar), choose subjects and content types, then **Scan & preview** to see what will be downloaded, and **Download** to fetch everything in parallel with a live progress bar. Results can be exported as a ZIP.
-- **Browse tab** — drill into a batch → subject → topic and open/download notes, DPPs, attempted quizzes with solutions, announcements, and lecture info individually.
+- **Download tab** — pick a batch (sidebar), choose subjects and content types, then **Scan & preview** to see what will be downloaded, and **Download** to fetch everything in parallel with a live progress bar. Results can be exported as a ZIP. Selecting **Videos** queues each lecture video as a job (needs `ffmpeg` and `mp4decrypt` on PATH).
+- **Browse tab** — drill into a batch → subject → topic and open/download notes, DPPs, attempted quizzes with solutions, announcements, and lecture info individually. The **Lectures** tab also shows a **Download MP4** button per lecture.
 
 ## CLI Usage
 
@@ -132,6 +140,7 @@ SMTP_PASSWORD=app-password
 core/            # API + download logic
   content.py     # batches, subjects, topics, notes, DPP, lectures, announcements, quiz
   downloader.py  # job builder, parallel downloads, ZIP export
+  video.py       # DASH manifest parsing + Widevine DRM video downloads
   quiz.py        # builds self-contained quiz HTML
   utils.py       # session, retries, auth helpers
   generate_token.py  # OTP login
@@ -145,7 +154,7 @@ streamlit.py     # web app
 
 ## Purpose
 
-This app is designed to help PW students manage and access their enrolled study resources — notes, DPPs, quizzes and announcements — more efficiently. It does **not** provide access to video lectures or any DRM-protected content; lecture streams are listed only. Usage is limited to your own legitimately enrolled courses on pw.live.
+This app is designed to help PW students manage and access their enrolled study resources — notes, DPPs, quizzes, announcements and lecture videos — more efficiently. Video downloads use your own valid session token against the batches you are enrolled in; DRM-protected streams are decrypted locally on your machine. Usage is limited to your own legitimately enrolled courses on pw.live.
 
 ## Disclaimer
 
