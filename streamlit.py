@@ -1,22 +1,59 @@
 import os
+import threading
+import time
+from collections import Counter
+
+import requests
 import streamlit as st
+from dotenv import load_dotenv
+
+from core.content import (
+    build_content_tree, fetch_notes, fetch_dpp, fetch_lectures,
+    fetch_announcements, fetch_topic_quiz,
+)
+from core.downloader import build_download_jobs, run_downloads, zip_dir, _safe_filename
 from core.generate_token import send_otp, get_token
 from core.utils import verify_token
-from core.content import fetch_batches, fetch_subjects, fetch_topics, fetch_notes, fetch_dpp
-from dotenv import load_dotenv
-import zipfile
-import io
-import requests
+from core.video import check_dependencies, download_video
 
-# --- Constants ---
-DATA_DIR = "data"
-TOKEN_FILE = os.path.join(DATA_DIR, "token.txt")
-os.makedirs(DATA_DIR, exist_ok=True)
 load_dotenv()
 
+DATA_DIR = "data"
+OUT_DIR = "downloads"
+TOKEN_FILE = os.path.join(DATA_DIR, "token.txt")
+ALL_TYPES = ["Notes", "DPP", "Quiz", "Announcements", "Lectures", "Videos"]
+TYPE_HELP = {
+    "Notes": "Class notes · PDFs",
+    "DPP": "Daily practice problems · PDFs",
+    "Quiz": "Attempted DPP quizzes with solutions · HTML",
+    "Announcements": "Batch announcements & attachments",
+    "Lectures": "Lecture listing only (DRM-protected videos)",
+    "Videos": "Download lecture videos as MP4 (needs ffmpeg + mp4decrypt)",
+}
+
+CSS = """
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header[data-testid="stHeader"] {background: transparent;}
+.block-container {padding-top: 2rem; padding-bottom: 3rem; max-width: 1100px;}
+div[data-testid="stMetric"] {
+    background: #f6f7f9;
+    border-radius: 12px;
+    padding: 12px 16px;
+}
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {gap: 0.5rem;}
+.stTabs [data-baseweb="tab-list"] {gap: 6px;}
+.stTabs [data-baseweb="tab"] {border-radius: 8px; padding: 6px 14px;}
+</style>
+"""
+
+
 def save_token(token):
+    os.makedirs(DATA_DIR, exist_ok=True)
     with open(TOKEN_FILE, "w") as f:
         f.write(token)
+
 
 def load_token():
     if os.path.exists(TOKEN_FILE):
@@ -24,261 +61,429 @@ def load_token():
             return f.read().strip()
     return None
 
+
 def delete_token():
     if os.path.exists(TOKEN_FILE):
         os.remove(TOKEN_FILE)
 
+
 def check_token(token):
-    if token:
-        res = verify_token(token)
-        return res.get("success", False)
-    return False
+    if not token:
+        return False
+    return verify_token(token).get("success", False)
 
-def zip_files(file_dict):
-    mem_zip = io.BytesIO()
-    with zipfile.ZipFile(mem_zip, 'w') as zf:
-        for filename, url in file_dict.items():
-            try:
-                resp = requests.get(url)
-                if resp.ok:
-                    zf.writestr(filename, resp.content)
-            except Exception:
-                continue
-    mem_zip.seek(0)
-    return mem_zip
 
-# -- Prefetch batches/subjects/topics all-at-once on login --
-@st.cache_data(show_spinner=False)
-def prefetch_all_batches_subjects_topics(token):
-    batches_raw = fetch_batches(token)
-    batches_list = []
-    if isinstance(batches_raw, dict) and "batches" in batches_raw:
-        batches_list = batches_raw["batches"]
-    elif isinstance(batches_raw, list):
-        batches_list = batches_raw
+def _att_url(att):
+    base_url = att.get("baseUrl") or ""
+    key = att.get("key") or ""
+    if not key:
+        return None
+    return base_url.rstrip("/") + "/" + key.lstrip("/")
 
-    result = {}  # {batch_id: {'batch':{}, 'subjects':{subject_id:{'subject':{}, 'topics':{topic_id:topic}}}}}
-    for batch in batches_list:
-        batch_id = batch.get('_id') or batch.get('id') or batch.get('slug')
-        batch_slug = batch.get('slug')
-        subjects = fetch_subjects(token, batch_slug)
-        subj_dict = {}
-        for subj in subjects:
-            subject_id = subj.get('_id') or subj.get('id') or subj.get('slug')
-            subj_slug = subj.get('slug')
-            topics = fetch_topics(token, batch_slug, subj_slug)
-            topic_dict = {}
-            for topic in topics:
-                topic_id = topic.get('_id') or topic.get('id') or topic.get('slug')
-                topic_dict[topic_id] = topic
-            subj_dict[subject_id] = {
-                'subject': subj,
-                'topics': topic_dict
-            }
-        result[batch_id] = {
-            'batch': batch,
-            'subjects': subj_dict
-        }
-    return result
 
-def main():
-    st.set_page_config("PW Batch Dashboard", layout="wide")
-    token = load_token()
-    if 'otp_sent' not in st.session_state:
-        st.session_state["otp_sent"] = False
+# ---------------- Login ----------------
 
-    # ---- LOGIN PAGE ----
-    if not token or not check_token(token):
-        st.title("Login to PW Dashboard")
-        left, right = st.columns(2)
+def _render_login():
+    st.markdown(CSS, unsafe_allow_html=True)
+    _, mid, _ = st.columns([1, 2, 1])
+    with mid:
+        st.markdown("## PW Study Material")
+        st.markdown("#### Login to continue")
+        method = st.radio("Login method", ["Paste access token", "Phone + OTP"], horizontal=True)
 
-        # LEFT: OTP login
-        with left:
-            st.subheader("Login via OTP")
-            cc = st.text_input("Country Code", value="+91", max_chars=5)
-            phone = st.text_input("Phone Number")
-            if st.button("Send OTP"):
+        if method == "Paste access token":
+            token = st.text_area("Access token", height=110, placeholder="eyJhbGciOi...")
+            if st.button("Login", type="primary", use_container_width=True):
+                if token.strip() and check_token(token.strip()):
+                    save_token(token.strip())
+                    st.session_state.clear()
+                    st.rerun()
+                elif token.strip():
+                    st.error("Invalid token. Please check and try again.")
+                else:
+                    st.warning("Paste your access token first.")
+        else:
+            cc = st.text_input("Country code", value="+91", max_chars=5)
+            phone = st.text_input("Phone number")
+            if st.button("Send OTP", use_container_width=True):
                 if phone and cc:
                     resp = send_otp(phone, cc)
                     if resp.get("success"):
                         st.session_state["otp_sent"] = True
-                        st.success("OTP sent to your phone.")
+                        st.toast("OTP sent to your phone.")
                     else:
-                        st.error(resp.get("error_message", "Failed to send OTP."))
                         st.session_state["otp_sent"] = False
+                        st.error(resp.get("error_message", "Failed to send OTP."))
                 else:
-                    st.warning("Please enter both country code and phone number.")
-            if st.session_state["otp_sent"]:
-                otp = st.text_input("Enter OTP")
-                if st.button("Verify OTP & Login"):
+                    st.warning("Enter your phone number and country code.")
+            if st.session_state.get("otp_sent"):
+                otp = st.text_input("Enter OTP", max_chars=6)
+                if st.button("Verify & Login", type="primary", use_container_width=True):
                     if otp:
                         tkres = get_token(phone, otp)
                         if tkres.get("success"):
                             save_token(tkres["access_token"])
-                            st.success("Login successful. Redirecting…")
                             st.session_state.clear()
                             st.rerun()
                         else:
-                            st.error(tkres.get("error_message", "Invalid OTP"))
+                            st.error(tkres.get("error_message", "Invalid OTP."))
                     else:
-                        st.warning("Please enter the OTP.")
+                        st.warning("Enter the OTP.")
 
-        # RIGHT: Paste token
-        with right:
-            st.subheader("Use Existing Access Token")
-            input_token = st.text_area("Access Token", height=120)
-            if st.button("Verify Token & Login"):
-                if input_token.strip():
-                    if check_token(input_token.strip()):
-                        save_token(input_token.strip())
-                        st.success("Token verified. Redirecting…")
-                        st.session_state.clear()
-                        st.rerun()
-                    else:
-                        st.error("Invalid token. Please check and try again.")
-                else:
-                    st.warning("Please paste your access token before verifying.")
 
+# ---------------- Download ----------------
+
+def _jobs_key(bid, subject_ids, types):
+    return f"jobs_{bid}_{'-'.join(sorted(subject_ids))}_{'-'.join(sorted(types))}"
+
+
+def _jobs_summary(jobs):
+    kinds = Counter(j.get("kind") for j in jobs)
+    return kinds
+
+
+def _render_downloader(token, batch):
+    batch_info = batch["batch"]
+    subjects_dict = batch["subjects"]
+    subj_names = {
+        sid: (subjects_dict[sid]["subject"].get("subject") or sid)
+        for sid in subjects_dict
+    }
+    subject_ids = list(subj_names.keys())
+
+    st.subheader("What do you want to download?")
+    subj_key = f"subj_sel_{batch_info.get('_id')}"
+    st.session_state.setdefault(subj_key, subject_ids)
+    col_sel, col_clear = st.columns([6, 1])
+    with col_sel:
+        sel_subject_ids = st.multiselect(
+            "Subjects",
+            subject_ids,
+            key=subj_key,
+            format_func=lambda sid: subj_names[sid],
+            placeholder="Choose one or more subjects",
+        )
+    with col_clear:
+        st.write("")
+        st.write("")
+        b1, b2 = st.columns(2)
+        if b1.button("All", use_container_width=True):
+            st.session_state[subj_key] = subject_ids
+            st.rerun()
+        if b2.button("None", use_container_width=True):
+            st.session_state[subj_key] = []
+            st.rerun()
+
+    sel_types = st.multiselect(
+        "Content",
+        ALL_TYPES,
+        default=[t for t in ALL_TYPES if t != "Videos"],
+        help="Videos downloads need ffmpeg and mp4decrypt (Bento4) on PATH.",
+    )
+    if sel_types:
+        for t in ALL_TYPES:
+            if t in sel_types:
+                st.caption(f"• **{t}** — {TYPE_HELP[t]}")
+
+    col_w, col_sp = st.columns([2, 3])
+    workers = col_w.slider("Parallel downloads", min_value=1, max_value=32, value=8)
+
+    if not sel_subject_ids:
+        st.info("Pick at least one subject.")
+        return
+    if not sel_types:
+        st.info("Pick at least one content type.")
         return
 
-    # ---- PREFETCH ALL BATCH/SUBJECT/TOPIC TREE (ONCE) ----
-    if 'all_batches' not in st.session_state:
+    types = list(sel_types)
+    key = _jobs_key(batch_info.get("_id"), sel_subject_ids, types)
+    jobs = st.session_state.get(key)
+
+    col_preview, col_dl = st.columns([1, 1])
+    if col_preview.button("Scan & preview", use_container_width=True):
+        with st.spinner("Scanning your subjects..."):
+            jobs = build_download_jobs(token, batch, sel_subject_ids, types, OUT_DIR)
+        st.session_state[key] = jobs
+
+    if jobs is not None:
+        kinds = _jobs_summary(jobs)
+        total = len(jobs)
+        m1, m2, m3, m4, m5 = st.columns(5)
+        m1.metric("Files", kinds.get("file", 0))
+        m2.metric("Quizzes", kinds.get("quiz", 0))
+        m3.metric("Lecture lists", kinds.get("lectures", 0))
+        m4.metric("Videos", kinds.get("video", 0))
+        m5.metric("Total items", total)
+        st.caption(f"Will be saved under `downloads/{_safe_filename(batch_info.get('name'))}`")
+
+    if col_dl.button(
+        f"Download{' ' + str(len(jobs)) if jobs else ''}",
+        type="primary",
+        use_container_width=True,
+        disabled=not jobs,
+    ):
+        if jobs is None:
+            with st.spinner("Scanning your subjects..."):
+                jobs = build_download_jobs(token, batch, sel_subject_ids, types, OUT_DIR)
+            st.session_state[key] = jobs
+        if not jobs:
+            st.info("Nothing to download for this selection.")
+            return
+
+        prog = st.progress(0.0, text="Starting...")
+        start = time.time()
+
+        def on_progress(done, total):
+            prog.progress(done / total if total else 1.0, text=f"{done}/{total}")
+
+        results = run_downloads(jobs, workers=workers, progress=on_progress)
+        elapsed = time.time() - start
+        ok = sum(1 for _, s, _ in results if s)
+        fail = len(results) - ok
+
+        st.toast(f"Finished — {ok} succeeded, {fail} failed")
+        col_ok, col_fail = st.columns(2)
+        col_ok.metric("Succeeded", ok)
+        col_fail.metric("Failed", fail)
+        st.caption(f"Done in {elapsed:.1f}s")
+
+        failed = [r for r in results if not r[1]]
+        if failed:
+            with st.expander(f"Show {len(failed)} failures"):
+                st.dataframe(
+                    [{"item": l, "detail": d} for l, _, d in failed],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+        base = os.path.join(OUT_DIR, _safe_filename(batch_info.get("name")))
+        if os.path.isdir(base):
+            zip_path = base + ".zip"
+            zip_dir(base, zip_path)
+            with open(zip_path, "rb") as f:
+                st.download_button(
+                    "Download everything as ZIP",
+                    f.read(),
+                    file_name=os.path.basename(zip_path),
+                    mime="application/zip",
+                    use_container_width=True,
+                )
+            st.caption(f"Saved to `{os.path.abspath(base)}`")
+
+
+# ---------------- Browse ----------------
+
+def _thread_safe_progress(placeholder):
+    """Progress callback that only touches Streamlit from the main thread."""
+
+    def on_progress(done, total, message=""):
+        if threading.current_thread() is threading.main_thread():
+            text = f"{message} {done}/{total}" if message else f"{done}/{total}"
+            placeholder.progress(done / total if total else 1.0, text=text)
+
+    return on_progress
+
+
+def _render_attachments(entries, prefix):
+    if not entries:
+        st.info("Nothing here yet.")
+        return
+    for entry in entries:
+        st.markdown(f"**{entry.get('topic') or 'Untitled'}**")
+        for att in entry.get("attachments", []):
+            url = _att_url(att)
+            name = att.get("name") or "file"
+            if not url:
+                continue
+            c1, c2, c3 = st.columns([6, 2, 2])
+            c1.write(name)
+            c2.markdown(f"[Open]({url})")
+            try:
+                resp = requests.get(url, timeout=30)
+                if resp.ok:
+                    c3.download_button(
+                        "Download", resp.content,
+                        file_name=name, key=f"{prefix}{name}{url}",
+                    )
+                else:
+                    c3.write("Unavailable")
+            except Exception:
+                c3.write("Unavailable")
+        st.divider()
+
+
+def _render_browser(token, batch):
+    batch_info = batch["batch"]
+    subjects_dict = batch["subjects"]
+    subject_ids = list(subjects_dict.keys())
+    if not subject_ids:
+        st.info("No subjects in this batch.")
+        return
+
+    c1, c2 = st.columns(2)
+    subj_id = c1.selectbox(
+        "Subject",
+        subject_ids,
+        format_func=lambda s: subjects_dict[s]["subject"].get("subject", s),
+    )
+    subj_entry = subjects_dict[subj_id]
+    subject = subj_entry["subject"]
+    topics_dict = subj_entry["topics"]
+    if not topics_dict:
+        st.info("No topics for this subject.")
+        return
+    topic_id = c2.selectbox(
+        "Topic",
+        list(topics_dict.keys()),
+        format_func=lambda t: topics_dict[t].get("name", t),
+    )
+    topic = topics_dict[topic_id]
+    slug, subj_slug, topic_slug = batch_info.get("slug"), subject.get("slug"), topic.get("slug")
+
+    tab_notes, tab_dpp, tab_quiz, tab_ann, tab_lec = st.tabs(
+        ["Notes", "DPP", "Quiz", "Announcements", "Lectures"]
+    )
+
+    with tab_notes:
+        _render_attachments(fetch_notes(token, slug, subj_slug, topic_slug), "n")
+
+    with tab_dpp:
+        _render_attachments(fetch_dpp(token, slug, subj_slug, topic_slug), "d")
+
+    with tab_quiz:
+        questions = fetch_topic_quiz(token, batch_info.get("_id"), subject.get("_id"), topic.get("_id"))
+        if not questions:
+            st.info("No attempted quiz for this topic (only attempted quizzes can be opened).")
+        else:
+            st.caption(f"**{len(questions)} questions** with solutions")
+            for q in questions:
+                st.markdown(f"**Q{q.get('questionNumber')}** · {q.get('topicName') or ''}")
+                for img in q.get("images", []):
+                    url = _att_url(img)
+                    if url:
+                        st.image(url)
+                for j, opt in enumerate(q.get("options", [])):
+                    mark = " ✓" if opt["_id"] in (q.get("solution_option_ids") or []) else ""
+                    st.markdown(f"`{chr(65 + j)}` {opt.get('en') or ''}{mark}")
+                for sd in q.get("solutionDescriptions", []):
+                    url = _att_url(sd)
+                    if url:
+                        st.image(url)
+
+    with tab_ann:
+        announcements = fetch_announcements(token, batch_info.get("_id"))
+        if not announcements:
+            st.info("No announcements.")
+        else:
+            for ann in announcements:
+                st.markdown(f"**{ann.get('scheduleTime', '')}**")
+                st.write(ann.get("announcement", ""))
+                att = ann.get("attachment")
+                if att:
+                    url = _att_url(att)
+                    if url:
+                        st.markdown(f"[Attachment]({url})")
+
+    with tab_lec:
+        lectures = fetch_lectures(token, slug, subj_slug, topic_slug)
+        if not lectures:
+            st.info("No lectures for this topic.")
+        else:
+            ffmpeg, mp4decrypt = check_dependencies()
+            if not ffmpeg:
+                st.warning("`ffmpeg` not found on PATH — video downloads are disabled.")
+            elif mp4decrypt is None:
+                st.warning(
+                    "`mp4decrypt` (Bento4) not found on PATH — DRM-protected "
+                    "lectures will fail to decrypt."
+                )
+            for L in lectures:
+                c1, c2 = st.columns([6, 3])
+                c1.markdown(f"**{L.get('topic')}** · {L.get('duration')}")
+                if c2.button(
+                    "Download MP4",
+                    key=f"dlv{L.get('_id')}",
+                    disabled=not ffmpeg,
+                    use_container_width=True,
+                ):
+                    prog = st.progress(0.0, text="Starting...")
+                    fname = _safe_filename(L.get("topic")) + ".mp4"
+                    dest = os.path.join(
+                        OUT_DIR,
+                        _safe_filename(batch_info.get("name")),
+                        _safe_filename(subject.get("subject")),
+                        _safe_filename(topic.get("name")),
+                        "Videos",
+                        fname,
+                    )
+                    with st.spinner("Downloading lecture…"):
+                        ok, detail = download_video(
+                            token,
+                            L,
+                            slug,
+                            dest,
+                            ffmpeg=ffmpeg,
+                            mp4decrypt=mp4decrypt,
+                            progress=_thread_safe_progress(prog),
+                        )
+                    if ok:
+                        st.success(f"Saved: `{detail}`")
+                    else:
+                        st.error(f"Download failed: {detail}")
+            st.caption(
+                "DRM-protected lectures need `ffmpeg` and `mp4decrypt` (Bento4) "
+                "on PATH to decrypt and merge."
+            )
+
+
+# ---------------- App ----------------
+
+def main():
+    st.set_page_config("PW Study Material", layout="wide")
+    if "otp_sent" not in st.session_state:
+        st.session_state["otp_sent"] = False
+
+    token = load_token()
+    if not token or not check_token(token):
+        _render_login()
+        return
+
+    if "tree" not in st.session_state:
         with st.spinner("Loading your batches, subjects and chapters..."):
-            st.session_state['all_batches'] = prefetch_all_batches_subjects_topics(token)
+            st.session_state["tree"] = build_content_tree(token)
 
-    all_data = st.session_state.get('all_batches', {})
-
-    if not all_data or len(all_data) == 0:
-        st.warning("No batches or data found for your user.")
+    tree = st.session_state["tree"]
+    if not tree:
+        st.warning("No batches found for your account.")
         if st.button("Logout"):
             delete_token()
             st.session_state.clear()
             st.rerun()
         return
 
-    # ---- MAIN DASHBOARD ----
-    st.button("Logout", on_click=lambda: (delete_token(), st.session_state.clear(), st.rerun()), key="logout-btn")
-    st.title("PW Study Material Dashboard")
+    batch_ids = list(tree.keys())
+    with st.sidebar:
+        st.markdown("#### PW Study Material")
+        batch_id = st.selectbox(
+            "Batch",
+            batch_ids,
+            format_func=lambda b: tree[b]["batch"].get("name", b),
+        )
+        st.caption(f"{len(tree[batch_id]['subjects'])} subjects in this batch")
+        if st.button("Logout", use_container_width=True):
+            delete_token()
+            st.session_state.clear()
+            st.rerun()
 
-    # BATCH SELECTOR:
-    batch_id_to_name = {bid: all_data[bid]['batch'].get('name', bid) for bid in all_data}
-    batch_ids = list(batch_id_to_name.keys())
-    batch_names = [batch_id_to_name[bid] for bid in batch_ids]
-    if not batch_ids:
-        st.warning("No batches found for your account.")
-        return
-    selected_batch_idx = st.selectbox("Select Batch", range(len(batch_names)), format_func=lambda i: batch_names[i])
-    sel_batch_id = batch_ids[selected_batch_idx]
-    sel_batch = all_data[sel_batch_id]['batch']
-    sel_batch_slug = sel_batch.get('slug')
+    batch = tree[batch_id]
+    st.markdown(CSS, unsafe_allow_html=True)
 
-    # SUBJECT SELECTOR:
-    subjects_dict = all_data[sel_batch_id]['subjects']
-    subject_id_to_name = {sid: subjects_dict[sid]['subject'].get('subject', sid) for sid in subjects_dict}
-    subject_ids = list(subject_id_to_name.keys())
-    subject_names = [subject_id_to_name[sid] for sid in subject_ids]
-    if not subject_ids:
-        st.warning("No subjects found for the selected batch.")
-        return
-    selected_subject_idx = st.selectbox("Select Subject", range(len(subject_names)), format_func=lambda i: subject_names[i])
-    sel_subject_id = subject_ids[selected_subject_idx]
-    sel_subject = subjects_dict[sel_subject_id]['subject']
-    sel_subject_slug = sel_subject.get('slug')
+    tab_dl, tab_br = st.tabs(["⬇  Download", "◈  Browse"])
+    with tab_dl:
+        _render_downloader(token, batch)
+    with tab_br:
+        _render_browser(token, batch)
 
-    # TOPIC SELECTOR:
-    topics_dict = subjects_dict[sel_subject_id]['topics']
-    topic_id_to_name = {tid: topics_dict[tid].get('name', tid) for tid in topics_dict}
-    topic_ids = list(topic_id_to_name.keys())
-    topic_names = [topic_id_to_name[tid] for tid in topic_ids]
-    if not topic_ids:
-        st.info("No topics for this subject.")
-        return
-    selected_topic_idx = st.selectbox("Select Topic/Chapter", range(len(topic_names)), format_func=lambda i: topic_names[i])
-    sel_topic_id = topic_ids[selected_topic_idx]
-    sel_topic = topics_dict[sel_topic_id]
-    sel_topic_slug = sel_topic.get('slug')
-    topic_name = sel_topic.get('name')
-
-    # RADIO SELECTOR FOR CONTENT TYPE:
-    tab = st.radio(
-        "Select Content Type",
-        ["Notes", "DPP", "DPP-Quiz", "Announcements"],
-        horizontal=True
-    )
-
-    file_dict = dict()
-
-    # --- NOTES TAB ---
-    if tab == "Notes":
-        notes = fetch_notes(token, sel_batch_slug, sel_subject_slug, sel_topic_slug)
-        st.subheader(f"Notes for Topic: {topic_name}")
-        if notes:
-            col1, col2, col3 = st.columns([7, 1, 1])
-            col1.write("Name")
-            col2.write("View")
-            col3.write("Download")
-            for entry in reversed(notes):
-                topic_display = entry.get("topic") or "Untitled"
-                for att in entry.get("attachments", []):
-                    filename = att.get("name") or f"{topic_display}.pdf"
-                    url = att.get("baseUrl", "").rstrip("/") + "/" + att.get("key", "").lstrip("/")
-                    cols = st.columns([7, 1, 1])
-                    cols[0].write(filename)
-                    cols[1].markdown(f'[Link]({url})', unsafe_allow_html=True)
-                    try:
-                        resp = requests.get(url)
-                        if resp.ok:
-                            cols[2].download_button("Download", resp.content, file_name=filename, mime="application/pdf")
-                        else:
-                            cols[2].write("Unavailable")
-                    except Exception:
-                        cols[2].write("Unavailable")
-                    file_dict[filename] = url
-            if file_dict:
-                if st.button("Download All Notes as ZIP"):
-                    mem_zip = zip_files(file_dict)
-                    st.download_button("Download All Notes", mem_zip, file_name=f"{topic_name}_notes.zip")
-        else:
-            st.info("No notes found for this topic.")
-
-    # --- DPP TAB ---
-    elif tab == "DPP":
-        dpp = fetch_dpp(token, sel_batch_slug, sel_subject_slug, sel_topic_slug)
-        st.subheader(f"DPPs for Topic: {topic_name}")
-        if dpp:
-            col1, col2, col3 = st.columns([7, 1, 1])
-            col1.write("Name")
-            col2.write("View")
-            col3.write("Download")
-            for entry in reversed(dpp):
-                topic_display = entry.get("topic") or "Untitled"
-                for att in entry.get("attachments", []):
-                    filename = att.get("name") or f"{topic_display}.pdf"
-                    url = att.get("baseUrl", "").rstrip("/") + "/" + att.get("key", "").lstrip("/")
-                    cols = st.columns([7, 1, 1])
-                    cols[0].write(filename)
-                    cols[1].markdown(f'[Link]({url})', unsafe_allow_html=True)
-                    try:
-                        resp = requests.get(url)
-                        if resp.ok:
-                            cols[2].download_button("Download", resp.content, file_name=filename, mime="application/pdf")
-                        else:
-                            cols[2].write("Unavailable")
-                    except Exception:
-                        cols[2].write("Unavailable")
-                    file_dict[filename] = url
-            if file_dict:
-                if st.button("Download All DPPs as ZIP"):
-                    mem_zip = zip_files(file_dict)
-                    st.download_button("Download All DPPs", mem_zip, file_name=f"{topic_name}_dpp.zip")
-        else:
-            st.info("No DPPs found for this topic.")
-
-    # --- DPP QUIZ/ANNOUNCEMENTS ---
-    elif tab == "DPP-Quiz":
-        st.info("Upcoming feature: DPP-Quiz downloads/view will be available soon.")
-    elif tab == "Announcements":
-        st.info("Upcoming feature: Announcements will be shown here soon.")
 
 if __name__ == "__main__":
     main()
